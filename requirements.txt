@@ -1,0 +1,2 @@
+pyserial>=3.5
+odrive==0.5.1
