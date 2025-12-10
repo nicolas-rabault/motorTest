@@ -1,0 +1,11 @@
+{
+  "name": "Example BLDC Motor",
+  "description": "Template motor profile",
+
+  "motor_type": "high_current",
+  "pole_pairs": 7,
+  "kv_rating": 115,
+
+  "current_lim": 10.0,
+  "calibration_current": 5.0
+}

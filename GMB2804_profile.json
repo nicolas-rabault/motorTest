@@ -1,0 +1,11 @@
+{
+  "name": "GMB2804",
+  "description": "Small gimbal motor for testing",
+
+  "motor_type": "gimbal",
+  "pole_pairs": 7,
+  "kv_rating": 170,
+
+  "current_lim": 1.0,
+  "calibration_current": 0.5
+}
