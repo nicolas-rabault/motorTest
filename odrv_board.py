@@ -55,25 +55,17 @@ class MotorProfile:
     """
     Motor configuration profile loaded from JSON.
     
-    Only essential parameters that vary between motors are included.
-    The ODrive board's onboard encoder is used for all motors.
-    
     Motor types:
         - "high_current": Standard BLDC motors (most common)
         - "gimbal": High-resistance gimbal motors (low current, no current sensing)
     """
-    # Motor identification
     name: str
     description: str = ""
-    
-    # Motor parameters
-    motor_type: str = "high_current"  # "high_current" or "gimbal"
+    motor_type: str = "high_current"
     pole_pairs: int = 7
-    kv_rating: float = 100.0  # Motor KV rating (RPM/V)
-    
-    # Current limits
-    current_lim: float = 10.0  # Amps - maximum operating current
-    calibration_current: float = 5.0  # Amps - current for calibration
+    kv_rating: float = 100.0
+    current_lim: float = 10.0
+    calibration_current: float = 5.0
     
     @property
     def torque_constant(self) -> float:
@@ -292,44 +284,55 @@ class ODriveBoard:
     # =========================================================================
     
     def load_profile(self, profile: MotorProfile) -> None:
-        """
-        Load motor profile and configure ODrive.
-        
-        Args:
-            profile: Motor configuration profile
-        """
+        """Load motor profile and configure ODrive."""
         if not self._connected:
             raise ODriveConnectionError("Not connected to ODrive")
         
         self._profile = profile
         self._log(f"Loading profile: {profile.name}")
         
-        # Motor configuration (0.5.x API)
-        motor_type_enum = profile.get_motor_type_enum()
-        self._axis.motor.config.motor_type = motor_type_enum.to_odrive()
-        self._axis.motor.config.pole_pairs = profile.pole_pairs
+        # Brake resistor (2 ohms, for 12V power supply without regen)
+        self._odrv.config.brake_resistance = 2.0
+        self._odrv.config.dc_bus_undervoltage_trip_level = 8.0
+        self._odrv.config.dc_bus_overvoltage_trip_level = 56.0
+        self._odrv.config.dc_max_negative_current = -5.0
+        self._odrv.config.dc_max_positive_current = profile.current_lim
+        self._odrv.config.max_regen_current = 0
         
-        # Current limits
+        # Motor configuration
+        self._axis.motor.config.motor_type = profile.get_motor_type_enum().to_odrive()
+        self._axis.motor.config.pole_pairs = profile.pole_pairs
         self._axis.motor.config.current_lim = profile.current_lim
         self._axis.motor.config.calibration_current = profile.calibration_current
-        
-        # Set requested current range (should be >= current_lim)
         self._axis.motor.config.requested_current_range = profile.current_lim * 1.25
+        
+        # AS5047P encoder (onboard, MKS ODrive Mini uses GPIO 4)
+        self._axis.encoder.config.mode = ENCODER_MODE_SPI_ABS_AMS
+        self._axis.encoder.config.cpr = 2**14
+        self._axis.encoder.config.abs_spi_cs_gpio_pin = 4
+        self._axis.encoder.config.bandwidth = 3000
+        self._axis.encoder.config.calib_range = 10
+        self._axis.encoder.config.abs_spi_cs_gpio_pin = 7
         
         self._log(f"  Motor type: {profile.motor_type}")
         self._log(f"  Pole pairs: {profile.pole_pairs}")
-        self._log(f"  KV: {profile.kv_rating} -> Kt: {profile.torque_constant:.4f} Nm/A")
         self._log(f"  Current limit: {profile.current_lim} A")
-        self._log("Profile loaded successfully")
+        self._log("Profile loaded")
     
     def save_configuration(self) -> None:
-        """Save current configuration to ODrive non-volatile memory."""
+        """Save current configuration to ODrive non-volatile memory. ODrive will reboot."""
         if not self._connected:
             raise ODriveConnectionError("Not connected to ODrive")
         
         self._log("Saving configuration...")
-        self._odrv.save_configuration()
-        self._log("Configuration saved")
+        try:
+            self._odrv.save_configuration()
+        except Exception:
+            pass  # Connection lost during reboot is expected
+        self._connected = False
+        self._odrv = None
+        self._axis = None
+        self._log("Configuration saved, ODrive rebooting")
     
     def reboot(self) -> None:
         """Reboot the ODrive. Connection will be lost."""
@@ -350,8 +353,19 @@ class ODriveBoard:
         if not self._connected:
             raise ODriveConnectionError("Not connected to ODrive")
         
-        # In 0.5.x, use dump_errors with clear=True
-        dump_errors(self._odrv, clear=True)
+        # Clear errors by setting them to 0
+        self._axis.error = 0
+        self._axis.motor.error = 0
+        self._axis.encoder.error = 0
+        self._axis.controller.error = 0
+        try:
+            self._axis.motor.fet_thermistor.error = 0
+        except Exception:
+            pass
+        try:
+            self._axis.motor.motor_thermistor.error = 0
+        except Exception:
+            pass
         self._log("Errors cleared")
     
     def get_errors(self) -> Dict[str, Any]:
@@ -372,7 +386,7 @@ class ODriveBoard:
         }
     
     def print_errors(self) -> None:
-        """Print formatted error summary."""
+        """Print error summary for the current axis."""
         if not self._connected:
             raise ODriveConnectionError("Not connected to ODrive")
         
@@ -792,16 +806,9 @@ def create_profile_template(filepath: str) -> None:
     profile = MotorProfile(
         name="Motor Template",
         description="Fill in motor specifications",
-        motor_type="high_current",
-        pole_pairs=7,
-        kv_rating=100.0,
-        current_lim=10.0,
-        calibration_current=5.0,
     )
     profile.to_json(filepath)
     print(f"Template profile created: {filepath}")
-    print(f"  Motor types: {[t.value for t in MotorType]}")
-    print(f"  Calculated Kt from KV: {profile.torque_constant:.4f} Nm/A")
 
 
 # =============================================================================
@@ -888,6 +895,12 @@ Examples:
                 profile = MotorProfile.from_json(args.profile)
                 odrv.load_profile(profile)
                 print(f"Loaded profile: {profile.name}")
+                print("Saving configuration (ODrive will reboot)...")
+                odrv.save_configuration()
+                time.sleep(2)
+                print("Reconnecting...")
+                odrv.connect(serial_number=args.serial)
+                print(f"Reconnected. Bus voltage: {odrv.read_bus_voltage():.2f} V")
             
             # Run calibration if requested
             if args.calibrate:
