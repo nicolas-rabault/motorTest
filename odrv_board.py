@@ -227,12 +227,26 @@ class ODriveBoard:
     # Control
     # =========================================================================
     
-    def enable(self) -> None:
+    def enable(self, timeout: float = 2.0) -> None:
         self.clear_errors()
         self._axis.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+        
+        # Wait for axis to enter closed-loop control
+        start = time.time()
+        while self._axis.current_state != AXIS_STATE_CLOSED_LOOP_CONTROL:
+            if time.time() - start > timeout:
+                self._log(f"Warning: Timeout waiting for closed-loop control (state={self._axis.current_state})")
+                break
+            if self._axis.error:
+                self._log(f"Warning: Axis error during enable: {self._axis.error}")
+                break
+            time.sleep(0.01)
+        
+        self._log(f"Axis state: {self._axis.current_state}")
     
     def disable(self) -> None:
         self._axis.requested_state = AXIS_STATE_IDLE
+        time.sleep(0.1)  # Brief wait for state transition
     
     def set_control_mode(self, mode: str) -> None:
         modes = {
@@ -263,7 +277,7 @@ class ODriveBoard:
     def read_state(self) -> MotorState:
         kt = self._profile.torque_constant if self._profile else 1.0
         iq = self._axis.motor.current_control.Iq_measured
-        
+
         return MotorState(
             position=self._axis.encoder.pos_estimate,
             velocity=self._axis.encoder.vel_estimate,
@@ -272,7 +286,7 @@ class ODriveBoard:
             iq_setpoint=self._axis.motor.current_control.Iq_setpoint,
             bus_voltage=self._odrv.vbus_voltage,
             bus_current=self._odrv.ibus,
-            fet_temperature=self._axis.motor.fet_thermistor.temperature,
+            fet_temperature=self._axis.fet_thermistor.temperature,
             motor_temperature=self._axis.motor_thermistor.temperature,
             torque_estimate=iq * kt,
         )
