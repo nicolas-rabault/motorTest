@@ -122,14 +122,17 @@ class ODriveBoard:
         self._axis.motor.config.current_lim = profile.current_lim
         self._axis.motor.config.calibration_current = profile.calibration_current
         self._axis.motor.config.requested_current_range = profile.current_lim * 1.25
-        
-        # Phase impedance (required for gimbal, optional for high_current)
+
+        # Phase impedance (required for gimbal motors)
         if profile.phase_resistance and profile.phase_inductance:
             self._axis.motor.config.phase_resistance = profile.phase_resistance
             self._axis.motor.config.phase_inductance = profile.phase_inductance
-            # pre_calibrated=True makes motor calibration skip measurement (uses stored values)
-            self._axis.motor.config.pre_calibrated = True
-            self._log(f"  Phase: R={profile.phase_resistance}Ω, L={profile.phase_inductance*1e6:.0f}µH")
+            # For gimbal motors with provided impedance, skip motor calibration
+            if profile.motor_type == "gimbal":
+                self._axis.motor.config.pre_calibrated = True
+            self._log(f"  Phase: R={profile.phase_resistance}Ω ({profile.phase_resistance*1000:.2f}mΩ), L={profile.phase_inductance*1e6:.2f}µH")
+        else:
+            self._log(f"  Phase impedance will be measured during calibration")
         
         # AS5047P encoder (GPIO 7)
         self._axis.encoder.config.mode = ENCODER_MODE_SPI_ABS_AMS
@@ -142,7 +145,14 @@ class ODriveBoard:
         self._axis.motor_thermistor.config.gpio_pin = 3
         self._axis.motor_thermistor.config.enabled = True
         set_motor_thermistor_coeffs(self._axis, Rload=3300, R_25=10000, Beta=3435, Tmin=-10, TMax=150)
-        
+
+        # Velocity control gains (for gimbal motors, increase gains to handle load)
+        if profile.motor_type == "gimbal":
+            # Higher gains for gimbal motors to handle brake resistance
+            self._axis.controller.config.vel_gain = 0.5
+            self._axis.controller.config.vel_integrator_gain = 1.0
+            self._log(f"  Velocity gains: P=0.5, I=1.0 (tuned for gimbal with load)")
+
         self._log(f"  Type: {profile.motor_type}, Poles: {profile.pole_pairs}")
     
     def save_configuration(self) -> None:
@@ -195,24 +205,32 @@ class ODriveBoard:
     
     def calibrate(self, timeout: float = 30.0) -> None:
         self.clear_errors()
-        
-        # Motor calibration
-        self._log("Motor calibration...")
-        self._run_state(AXIS_STATE_MOTOR_CALIBRATION, timeout)
-        if self._axis.motor.error:
-            self.print_errors()
-            raise CalibrationError("Motor calibration failed")
-        
+
+        # Motor calibration (if not pre-calibrated)
+        if not self._axis.motor.config.pre_calibrated:
+            self._log("Motor calibration...")
+            self._run_state(AXIS_STATE_MOTOR_CALIBRATION, timeout)
+            if self._axis.motor.error:
+                self.print_errors()
+                raise CalibrationError("Motor calibration failed")
+
+            # Read measured impedance
+            measured_r = self._axis.motor.config.phase_resistance
+            measured_l = self._axis.motor.config.phase_inductance
+            self._log(f"Measured: R={measured_r:.6f}Ω ({measured_r*1000:.2f}mΩ), L={measured_l:.9f}H ({measured_l*1e6:.2f}µH)")
+        else:
+            self._log("Motor calibration skipped (pre-calibrated)")
+
         self.clear_errors()
         time.sleep(0.5)
-        
+
         # Encoder offset calibration
         self._log("Encoder calibration...")
         self._run_state(AXIS_STATE_ENCODER_OFFSET_CALIBRATION, timeout)
         if self._axis.encoder.error:
             self.print_errors()
             raise CalibrationError("Encoder calibration failed")
-        
+
         self._log("Calibration complete")
     
     def _run_state(self, state: int, timeout: float) -> None:

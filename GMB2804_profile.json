@@ -5,7 +5,7 @@
   "pole_pairs": 7,
   "kv_rating": 170,
   "current_lim": 8.0,
-  "calibration_current": 5.0,
+  "calibration_current": 5.5,
   "phase_resistance": 9.0,
   "phase_inductance": 0.001
 }
