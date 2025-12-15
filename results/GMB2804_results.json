@@ -1,0 +1,26 @@
+{
+  "name": "GMB2804",
+  "description": "Small gimbal motor for testing",
+  "motor_type": "gimbal",
+  "pole_pairs": 7,
+  "electrical": {
+    "phase_resistance_ohm": 9.0,
+    "phase_inductance_mH": 1.0,
+    "KV_rpm_per_V": 8.047258571698553,
+    "KT_Nm_per_A": 0.0
+  },
+  "mechanical": {},
+  "thermal": {},
+  "limits": {
+    "max_current_A": 8.0,
+    "calibration_current_A": 5.0
+  },
+  "torque_burst_test": {
+    "duration_ms": 100,
+    "max_current_A": 8.0,
+    "data": []
+  },
+  "loaded_test_timestamp": "2025-12-11T17:06:41.509688",
+  "bus_voltage_V": 12.0164794921875,
+  "test_timestamp": "2025-12-12T16:41:01.822871"
+}
