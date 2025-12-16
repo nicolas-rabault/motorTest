@@ -136,7 +136,7 @@ class ODriveBoard:
         else:
             self._log(f"  Phase impedance will be measured during calibration")
         
-        # AS5047P encoder (GPIO 7)
+        # AS5047P encoder (GPIO 7) - absolute encoder
         self._axis.encoder.config.mode = ENCODER_MODE_SPI_ABS_AMS
         self._axis.encoder.config.cpr = 2**14
         self._axis.encoder.config.abs_spi_cs_gpio_pin = 7
@@ -157,6 +157,13 @@ class ODriveBoard:
 
         self._log(f"  Type: {profile.motor_type}, Poles: {profile.pole_pairs}")
     
+    def mark_as_precalibrated(self) -> None:
+        """Mark motor and encoder as pre-calibrated so calibration can be skipped on next boot."""
+        if self._axis.motor.is_calibrated:
+            self._axis.motor.config.pre_calibrated = True
+        if self._axis.encoder.is_ready:
+            self._axis.encoder.config.pre_calibrated = True
+
     def save_configuration(self) -> None:
         self._log("Saving configuration...")
         try:
@@ -226,12 +233,15 @@ class ODriveBoard:
         self.clear_errors()
         time.sleep(0.5)
 
-        # Encoder offset calibration
-        self._log("Encoder calibration...")
-        self._run_state(AXIS_STATE_ENCODER_OFFSET_CALIBRATION, timeout)
-        if self._axis.encoder.error:
-            self.print_errors()
-            raise CalibrationError("Encoder calibration failed")
+        # Encoder offset calibration (skip if pre-calibrated)
+        if not self._axis.encoder.config.pre_calibrated:
+            self._log("Encoder calibration...")
+            self._run_state(AXIS_STATE_ENCODER_OFFSET_CALIBRATION, timeout)
+            if self._axis.encoder.error:
+                self.print_errors()
+                raise CalibrationError("Encoder calibration failed")
+        else:
+            self._log("Encoder calibration skipped (pre_calibrated)")
 
         # Verify axis is ready for closed-loop control
         if not self._axis.motor.is_calibrated:
@@ -253,6 +263,12 @@ class ODriveBoard:
             if time.time() - start > timeout:
                 raise CalibrationError(f"Timeout")
             time.sleep(0.1)
+
+    def is_calibrated(self) -> bool:
+        """Check if motor and encoder are calibrated and ready for closed-loop control."""
+        return (self._axis.motor.is_calibrated and
+                self._axis.encoder.is_ready and
+                self._axis.error == 0)
     
     # =========================================================================
     # Control
@@ -279,13 +295,20 @@ class ODriveBoard:
         time.sleep(0.1)  # Brief wait for state transition
     
     def set_control_mode(self, mode: str) -> None:
+        """Set control mode. Axis should be in IDLE state for this to take effect properly."""
         modes = {
             'torque': CONTROL_MODE_TORQUE_CONTROL,
             'velocity': CONTROL_MODE_VELOCITY_CONTROL,
             'position': CONTROL_MODE_POSITION_CONTROL,
         }
+        # Ensure axis is idle before changing control mode
+        if self._axis.current_state != AXIS_STATE_IDLE:
+            self._axis.requested_state = AXIS_STATE_IDLE
+            time.sleep(0.1)  # Wait for state transition
+        
         self._axis.controller.config.control_mode = modes[mode.lower()]
         self._axis.controller.config.input_mode = INPUT_MODE_PASSTHROUGH
+        self._log(f"Control mode set to: {mode}")
     
     def set_torque(self, torque_nm: float) -> None:
         self._axis.controller.input_torque = torque_nm
@@ -320,6 +343,34 @@ class ODriveBoard:
             motor_temperature=self._axis.motor_thermistor.temperature,
             torque_estimate=iq * kt,
         )
+    
+    def get_control_mode(self) -> str:
+        """Get current control mode as string."""
+        mode = self._axis.controller.config.control_mode
+        if mode == CONTROL_MODE_TORQUE_CONTROL:
+            return 'torque'
+        elif mode == CONTROL_MODE_VELOCITY_CONTROL:
+            return 'velocity'
+        elif mode == CONTROL_MODE_POSITION_CONTROL:
+            return 'position'
+        else:
+            return f'unknown({mode})'
+    
+    def get_axis_state(self) -> str:
+        """Get current axis state as string."""
+        state = self._axis.current_state
+        states = {
+            AXIS_STATE_IDLE: 'IDLE',
+            AXIS_STATE_STARTUP_SEQUENCE: 'STARTUP_SEQUENCE',
+            AXIS_STATE_FULL_CALIBRATION_SEQUENCE: 'FULL_CALIBRATION_SEQUENCE',
+            AXIS_STATE_MOTOR_CALIBRATION: 'MOTOR_CALIBRATION',
+            AXIS_STATE_ENCODER_INDEX_SEARCH: 'ENCODER_INDEX_SEARCH',
+            AXIS_STATE_ENCODER_OFFSET_CALIBRATION: 'ENCODER_OFFSET_CALIBRATION',
+            AXIS_STATE_CLOSED_LOOP_CONTROL: 'CLOSED_LOOP_CONTROL',
+            AXIS_STATE_LOCKIN_SPIN: 'LOCKIN_SPIN',
+            AXIS_STATE_ENCODER_DIR_FIND: 'ENCODER_DIR_FIND',
+        }
+        return states.get(state, f'UNKNOWN({state})')
     
     def read_position(self) -> float:
         return self._axis.encoder.pos_estimate

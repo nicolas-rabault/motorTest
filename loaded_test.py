@@ -81,23 +81,68 @@ class LoadedTester:
 
     def measure_kt(self, test_currents: List[float]) -> float:
         """Measure torque constant KT using torque sensor. KT = τ / Iq"""
+        # Warm up torque sensor buffer before starting test
+        print("  Warming up torque sensor...")
+        warmup_count = 0
+        for _ in range(200):
+            data = self.torque_sensor.read()
+            if data:
+                warmup_count += 1
+            time.sleep(0.001)
+        print(f"  Sensor warmup: {warmup_count}/200 valid reads")
+
+        if warmup_count == 0:
+            raise RuntimeError("Torque sensor not responding - no data received during warmup")
+
         # Enable brake at 50% intensity to create load, then configure torque control mode
         self.brake.set_intensity(50.0)
         self.brake.enable()
         time.sleep(1.0)
+        
+        # Ensure axis is disabled before setting control mode
+        self.odrv.disable()
+        time.sleep(0.1)
+        
+        # Set control mode to torque
         self.odrv.set_control_mode('torque')
+        time.sleep(0.1)
+        
+        # Ensure input torque is zero before enabling
+        self.odrv.axis.controller.input_torque = 0.0
+        
+        # Enable motor
         self.odrv.enable()
+        time.sleep(0.2)  # Give motor time to initialize in closed-loop mode
+        
+        # Verify control mode and axis state
+        state = self.odrv.read_state()
+        print(f"  Axis state: {self.odrv.get_axis_state()}")
+        print(f"  Control mode: {self.odrv.get_control_mode()}")
+        print(f"  Input torque: {self.odrv.axis.controller.input_torque:.4f} Nm")
+        print(f"  Iq setpoint: {state.iq_setpoint:.2f} A, Iq measured: {state.iq_measured:.2f} A")
+        print(f"  Velocity: {state.velocity:.4f} turns/s")
+        
+        # Check for any axis errors
+        if self.odrv.axis.error != 0:
+            print(f"  WARNING: Axis error detected: {self.odrv.axis.error}")
+            self.odrv.print_errors()
 
         kt_measurements = []
 
         # Test at each current level (typically 1A, 2A, 3A, 4A)
         for current in test_currents:
             # Apply test current and wait for torque to stabilize
+            expected_torque = current * self.profile.torque_constant
             self.odrv.set_current(current)
-            time.sleep(1.0)
+            time.sleep(1.5)  # Increased wait time for torque to stabilize
+            
+            # Verify the input torque was set correctly
+            actual_input_torque = self.odrv.axis.controller.input_torque
+            if abs(actual_input_torque - expected_torque) > 0.001:
+                print(f"  Warning: Input torque mismatch! Expected {expected_torque:.4f} Nm, got {actual_input_torque:.4f} Nm")
 
             # Collect torque and current measurements for 2 seconds
-            torques, currents = [], []
+            torques, currents, velocities, positions = [], [], [], []
             start = time.time()
             while (time.time() - start) < 2.0:
                 sensor_data = self.torque_sensor.read()
@@ -106,11 +151,24 @@ class LoadedTester:
 
                 state = self.odrv.read_state()
                 currents.append(state.iq_measured)
+                velocities.append(state.velocity)
+                positions.append(state.position)
                 time.sleep(0.01)
+
+            # Check if we got any torque readings
+            if len(torques) == 0:
+                print(f"  Warning: No torque readings at {current}A (sensor not responding)")
+                continue
 
             # Calculate KT = torque / current for this test point
             avg_torque = sum(torques) / len(torques)
             avg_current = sum(currents) / len(currents)
+            avg_velocity = sum(velocities) / len(velocities)
+            position_change = max(positions) - min(positions)
+
+            print(f"  {current}A: torque={avg_torque:.4f} Nm, current={avg_current:.2f} A, "
+                  f"vel={avg_velocity:.3f} turns/s, pos_delta={position_change:.4f} turns, samples={len(torques)}")
+
             if abs(avg_current) > 0.1:
                 kt_measurements.append(abs(avg_torque) / abs(avg_current))
 
@@ -119,8 +177,15 @@ class LoadedTester:
         self.odrv.disable()
         self.brake.release()
 
-        # Return average KT from all measurements, or profile value if no valid measurements
-        return sum(kt_measurements) / len(kt_measurements) if kt_measurements else self.profile.torque_constant
+        # Check if we got any valid KT measurements
+        if len(kt_measurements) == 0:
+            raise RuntimeError(
+                "No valid KT measurements obtained - all test points failed. "
+                "Check torque sensor connection and ensure it's receiving data."
+            )
+
+        # Return average KT from all measurements
+        return sum(kt_measurements) / len(kt_measurements)
     
     def measure_thermal_parameters(self, test_current: float, heating_duration: float) -> ThermalTestData:
         """Measure thermal resistance and time constant."""
@@ -132,7 +197,10 @@ class LoadedTester:
         self.brake.set_intensity(30.0)
         self.brake.enable()
         time.sleep(0.5)
+        self.odrv.disable()
+        time.sleep(0.1)
         self.odrv.set_control_mode('torque')
+        time.sleep(0.1)
         self.odrv.enable()
 
         # Apply constant current and record temperature rise over time
@@ -186,7 +254,10 @@ class LoadedTester:
         time.sleep(0.5)
 
         # Configure torque control mode and enable
+        self.odrv.disable()
+        time.sleep(0.1)
         self.odrv.set_control_mode('torque')
+        time.sleep(0.1)
         self.odrv.enable()
 
         # Warm up torque sensor buffer with dummy reads
@@ -251,6 +322,18 @@ class LoadedTester:
         print("\n--- Test 1: KT Measurement ---")
         kt = self.measure_kt([1.0, 2.0, 3.0, min(4.0, max_current)])
         print(f"KT (measured): {kt:.4f} Nm/A")
+
+        # Check if KT measurement is valid
+        if kt < 0.0001:
+            raise RuntimeError(
+                "KT measurement failed - torque sensor reading zero!\n\n"
+                "Possible issues:\n"
+                "  1. Torque sensor not mechanically coupled to motor shaft\n"
+                "  2. Brake not providing enough resistance\n"
+                "  3. Motor not producing torque (check phase connections)\n"
+                "  4. Torque sensor calibration/zero offset issue\n\n"
+                "The motor is drawing current but no torque is being measured."
+            )
 
         # Calculate KV from measured KT and compare to spec
         kv_from_kt = 60.0 / (2.0 * math.pi * kt)

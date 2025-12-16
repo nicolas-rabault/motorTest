@@ -100,6 +100,14 @@ def run_no_load_test(profile: MotorProfile, args) -> None:
     odrv.calibrate()
     print("Calibration complete.")
 
+    # Mark calibrations as complete and save to persist pre_calibrated flags
+    print("Saving calibration...")
+    odrv.mark_as_precalibrated()
+    odrv.save_configuration()
+    time.sleep(2)
+    odrv.connect(serial_number=args.odrive_port)
+    print("Calibration saved - motor can skip calibration on next boot")
+
     # Run no-load tests
     tester = NoLoadTester(odrv, profile, debug=args.debug)
     result = tester.run_full_test(
@@ -171,10 +179,52 @@ def run_loaded_test(profile: MotorProfile, args) -> None:
         odrv.load_profile(profile)
         print(f"Bus voltage: {odrv.read_bus_voltage():.1f}V")
 
+        # Check if calibration exists - CANNOT calibrate with load attached
+        if not odrv.is_calibrated():
+            raise RuntimeError(
+                "Motor is not calibrated! The loaded test requires a calibrated motor.\n"
+                "You CANNOT run calibration with the brake/load attached.\n\n"
+                "To fix this:\n"
+                "  1. Disconnect the brake and torque sensor\n"
+                "  2. Ensure motor shaft is FREE to spin\n"
+                "  3. Run the no-load test first: ./motor_test.py --profile <profile.json> --no-load-only\n"
+                "  4. Then reconnect brake/sensor and run loaded test\n\n"
+                "Or run the complete test sequence without --loaded-only flag."
+            )
+
         # Connect to torque sensor
         print("Connecting to torque sensor...")
         sensor = TorqueSensor(args.sensor_port)
         sensor.connect()
+
+        # Wait for sensor to stabilize after USB reset
+        print("Waiting for sensor to stabilize...")
+        time.sleep(0.5)
+
+        # Verify sensor is receiving data
+        print("Verifying sensor data stream...")
+        test_count = 0
+        sample_values = []
+        for i in range(200):  # Increased from 100 to 200
+            data = sensor.read()
+            if data:
+                test_count += 1
+                sample_values.append(data.torque)
+                # Show first valid reading
+                if test_count == 1:
+                    print(f"  First reading: torque={data.torque:.4f} Nm, speed={data.speed} rpm")
+            time.sleep(0.001)
+
+        if test_count == 0:
+            raise RuntimeError(
+                f"Torque sensor not receiving data on {args.sensor_port}. "
+                "Check connection and ensure sensor is powered on."
+            )
+
+        # Show statistics
+        avg_torque = sum(sample_values) / len(sample_values) if sample_values else 0
+        print(f"  Sensor verification: {test_count}/200 valid reads - OK")
+        print(f"  Average torque: {avg_torque:.4f} Nm (should be near zero with no load)")
 
         # Connect to electromagnetic brake via power supply
         print("Connecting to brake...")

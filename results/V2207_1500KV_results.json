@@ -5,14 +5,20 @@
   "pole_pairs": 7,
   "kv_rating": 1500,
   "electrical": {
-    "phase_resistance_ohm": 0.08109578490257263,
-    "phase_inductance_mH": 0.006554298579430906
+    "phase_resistance_ohm": 0.08225687593221664,
+    "phase_inductance_mH": 0.006546653366967803,
+    "KT_Nm_per_A": 0.0005265178673658099,
+    "KV_from_KT_rpm_per_V": 18136.699962887502,
+    "KV_error_percent": 1109.1133308591668
   },
   "mechanical": {
-    "no_load_current_A": 0.20070773568896655,
-    "motor_inertia_kg_m2": 5.555428047508024e-05
+    "no_load_current_A": 0.1596202344520588,
+    "motor_inertia_kg_m2": 5.4467209688179254e-05
   },
-  "thermal": {},
+  "thermal": {
+    "thermal_resistance_C_per_W": 0.0,
+    "thermal_time_constant_s": 0.0
+  },
   "limits": {
     "max_current_A": 5.0,
     "calibration_current_A": 2.0
@@ -26,10 +32,379 @@
       {
         "timestamp": "2025-12-16T11:43:27.861253",
         "bus_voltage_V": 12.077710151672363
+      },
+      {
+        "timestamp": "2025-12-16T12:04:27.900010",
+        "bus_voltage_V": 12.001172065734863
+      },
+      {
+        "timestamp": "2025-12-16T13:52:07.601674",
+        "bus_voltage_V": 12.062402725219727
       }
     ],
-    "loaded": []
+    "loaded": [
+      {
+        "timestamp": "2025-12-16T12:19:57.246624",
+        "bus_voltage_V": 12.0164794921875
+      },
+      {
+        "timestamp": "2025-12-16T14:47:27.459004",
+        "bus_voltage_V": 12.062402725219727
+      },
+      {
+        "timestamp": "2025-12-16T14:51:09.399974",
+        "bus_voltage_V": 12.04709529876709
+      },
+      {
+        "timestamp": "2025-12-16T14:57:30.117366",
+        "bus_voltage_V": 12.031786918640137
+      },
+      {
+        "timestamp": "2025-12-16T15:12:30.371569",
+        "bus_voltage_V": 12.04709529876709
+      },
+      {
+        "timestamp": "2025-12-16T15:15:09.202927",
+        "bus_voltage_V": 12.04709529876709
+      }
+    ]
   },
-  "last_updated": "2025-12-16T11:43:27.861253",
-  "bus_voltage_V": 12.077710151672363
+  "last_updated": "2025-12-16T15:15:09.202927",
+  "bus_voltage_V": 12.04709529876709,
+  "torque_burst_test": {
+    "duration_ms": 100,
+    "max_current_A": 5.0,
+    "data": [
+      {
+        "timestamp_ms": 0.38504600524902344,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.0008748474360257604,
+        "current_A": 0.13742071390151978,
+        "velocity_turns_s": 0.06866455078125,
+        "position_turns": -0.2230968475341797,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 3.776073455810547,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03166306006962532,
+        "current_A": 4.973621845245361,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.223114013671875,
+        "motor_temperature_C": 24.11300277709961,
+        "bus_voltage_V": 12.12363338470459,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 7.179975509643555,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.032178918454699515,
+        "current_A": 5.054652690887451,
+        "velocity_turns_s": -0.1373291015625,
+        "position_turns": -0.2230510711669922,
+        "motor_temperature_C": 24.11300277709961,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 10.630130767822266,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03087529337151273,
+        "current_A": 4.849879741668701,
+        "velocity_turns_s": 0.1373291015625,
+        "position_turns": -0.22325992584228516,
+        "motor_temperature_C": 24.11300277709961,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 14.017105102539062,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.033451252164568755,
+        "current_A": 5.254510402679443,
+        "velocity_turns_s": 0.06866455078125,
+        "position_turns": -0.22319698333740234,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 17.414093017578125,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03139789694784727,
+        "current_A": 4.931970119476318,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.22321701049804688,
+        "motor_temperature_C": 24.07602882385254,
+        "bus_voltage_V": 11.955248832702637,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 20.765066146850586,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.031129658723122896,
+        "current_A": 4.889835357666016,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.22317981719970703,
+        "motor_temperature_C": 24.03902244567871,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 24.154186248779297,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03126377631766527,
+        "current_A": 4.910902500152588,
+        "velocity_turns_s": -0.274658203125,
+        "position_turns": -0.22310256958007812,
+        "motor_temperature_C": 24.03902244567871,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 27.888059616088867,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03189881391465711,
+        "current_A": 5.010653972625732,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.223114013671875,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 31.33106231689453,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03060315131422274,
+        "current_A": 4.807131767272949,
+        "velocity_turns_s": 0.06866455078125,
+        "position_turns": -0.2231283187866211,
+        "motor_temperature_C": 24.07602882385254,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 34.76405143737793,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03112156570786634,
+        "current_A": 4.888564109802246,
+        "velocity_turns_s": -0.20599365234375,
+        "position_turns": -0.22294235229492188,
+        "motor_temperature_C": 24.33429718017578,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 38.140058517456055,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03059807572475951,
+        "current_A": 4.806334495544434,
+        "velocity_turns_s": 0.0,
+        "position_turns": -0.22318553924560547,
+        "motor_temperature_C": 24.11300277709961,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 41.53609275817871,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03317423183439156,
+        "current_A": 5.210996150970459,
+        "velocity_turns_s": 0.06866455078125,
+        "position_turns": -0.22312545776367188,
+        "motor_temperature_C": 24.07602882385254,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 44.898033142089844,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03213848373481304,
+        "current_A": 5.0483012199401855,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.22312545776367188,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 48.380136489868164,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03264963991409864,
+        "current_A": 5.128593444824219,
+        "velocity_turns_s": 0.0,
+        "position_turns": -0.22315120697021484,
+        "motor_temperature_C": 23.964935302734375,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 51.77593231201172,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03201247433372539,
+        "current_A": 5.028507709503174,
+        "velocity_turns_s": 0.34332275390625,
+        "position_turns": -0.22328853607177734,
+        "motor_temperature_C": 24.18687629699707,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 55.136919021606445,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03239459154357147,
+        "current_A": 5.088530540466309,
+        "velocity_turns_s": 0.20599365234375,
+        "position_turns": -0.22333431243896484,
+        "motor_temperature_C": 23.890731811523438,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 58.52699279785156,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03135835470601234,
+        "current_A": 4.9257588386535645,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.22305679321289062,
+        "motor_temperature_C": 23.964935302734375,
+        "bus_voltage_V": 12.093017578125,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 61.88511848449707,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.032646315888702565,
+        "current_A": 5.128071308135986,
+        "velocity_turns_s": 0.1373291015625,
+        "position_turns": -0.22327136993408203,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.093017578125,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 65.26994705200195,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03185654566843344,
+        "current_A": 5.004014492034912,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.22310543060302734,
+        "motor_temperature_C": 24.03902244567871,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 68.64213943481445,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03133583633122872,
+        "current_A": 4.922221660614014,
+        "velocity_turns_s": -0.1373291015625,
+        "position_turns": -0.22315692901611328,
+        "motor_temperature_C": 24.297481536865234,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 72.0071792602539,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.032359897218227435,
+        "current_A": 5.083080768585205,
+        "velocity_turns_s": 0.0,
+        "position_turns": -0.2232799530029297,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.138940811157227,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 75.39105415344238,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03261995742978558,
+        "current_A": 5.123930931091309,
+        "velocity_turns_s": 0.0,
+        "position_turns": -0.2231884002685547,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 78.71818542480469,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.030293862134766775,
+        "current_A": 4.758548736572266,
+        "velocity_turns_s": 0.06866455078125,
+        "position_turns": -0.22297954559326172,
+        "motor_temperature_C": 24.07602882385254,
+        "bus_voltage_V": 12.093017578125,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 82.03411102294922,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.032617058393937866,
+        "current_A": 5.123475551605225,
+        "velocity_turns_s": 0.1373291015625,
+        "position_turns": -0.2229766845703125,
+        "motor_temperature_C": 23.104951858520508,
+        "bus_voltage_V": 12.093017578125,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 85.41321754455566,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03144361975197115,
+        "current_A": 4.939152240753174,
+        "velocity_turns_s": 0.1373291015625,
+        "position_turns": -0.2230539321899414,
+        "motor_temperature_C": 23.890731811523438,
+        "bus_voltage_V": 12.062402725219727,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 88.7460708618164,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03195049264373724,
+        "current_A": 5.018771648406982,
+        "velocity_turns_s": 0.0,
+        "position_turns": -0.22303390502929688,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 92.13900566101074,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03258647128901473,
+        "current_A": 5.11867094039917,
+        "velocity_turns_s": -0.06866455078125,
+        "position_turns": -0.22301673889160156,
+        "motor_temperature_C": 24.03902244567871,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 95.52407264709473,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.03155913191121441,
+        "current_A": 4.957296848297119,
+        "velocity_turns_s": 0.1373291015625,
+        "position_turns": -0.22315120697021484,
+        "motor_temperature_C": 24.07602882385254,
+        "bus_voltage_V": 12.04709529876709,
+        "measured_speed_RPM": 0
+      },
+      {
+        "timestamp_ms": 98.8931655883789,
+        "measured_torque_Nm": -0.001,
+        "estimated_torque_Nm": 0.030790802413659855,
+        "current_A": 4.836607933044434,
+        "velocity_turns_s": 0.0,
+        "position_turns": -0.22311973571777344,
+        "motor_temperature_C": 24.00199317932129,
+        "bus_voltage_V": 12.077710151672363,
+        "measured_speed_RPM": 0
+      }
+    ]
+  }
 }
