@@ -1,0 +1,35 @@
+{
+  "name": "V2207_1500KV",
+  "description": "Velox V2207 1500KV from T-motor painted in white",
+  "motor_type": "high_current",
+  "pole_pairs": 7,
+  "kv_rating": 1500,
+  "electrical": {
+    "phase_resistance_ohm": 0.08109578490257263,
+    "phase_inductance_mH": 0.006554298579430906
+  },
+  "mechanical": {
+    "no_load_current_A": 0.20070773568896655,
+    "motor_inertia_kg_m2": 5.555428047508024e-05
+  },
+  "thermal": {},
+  "limits": {
+    "max_current_A": 5.0,
+    "calibration_current_A": 2.0
+  },
+  "test_history": {
+    "no_load": [
+      {
+        "timestamp": "2025-12-16T11:37:17.986396",
+        "bus_voltage_V": 11.93994140625
+      },
+      {
+        "timestamp": "2025-12-16T11:43:27.861253",
+        "bus_voltage_V": 12.077710151672363
+      }
+    ],
+    "loaded": []
+  },
+  "last_updated": "2025-12-16T11:43:27.861253",
+  "bus_voltage_V": 12.077710151672363
+}

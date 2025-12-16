@@ -2,23 +2,12 @@
 """
 Motor No-Load Test Script
 
-This script runs tests on a motor with no load attached to measure:
+Measures motor characteristics without mechanical load:
     - Phase resistance and inductance (from calibration)
-    - KV: Motor velocity constant (RPM/V)
-    - no_load_current: The current drawn at steady-state with no mechanical load
-    - motor_inertia: The rotor moment of inertia (kg·m²)
+    - No-load current: Current at steady-state velocity
+    - Rotor inertia: J = τ / α where τ = Kt·Iq, α = dω/dt
 
-Setup requirements:
-    - Motor connected to ODrive
-    - No mechanical load, no brake, no external sensors
-    - Motor free to spin
-
-Test methodology:
-    1. Calibration: Measure phase resistance and inductance
-    2. KV: Spin motor at different velocities, calculate from back-EMF
-    3. No-load current: Spin motor at constant velocity, measure Iq current
-    4. Inertia: Apply known torque step, measure angular acceleration
-       J = τ / α  where τ = Kt * Iq and α = dω/dt
+Setup: Motor free to spin, no brake, no sensors.
 """
 
 import argparse
@@ -40,9 +29,6 @@ class NoLoadTestResult:
     # Electrical parameters (from calibration)
     phase_resistance_ohm: float
     phase_inductance_mH: float
-
-    # Motor constants
-    KV_rpm_per_V: float
 
     # No-load current measurement
     no_load_current_A: float  # Average Iq at steady-state (Amps)
@@ -130,80 +116,6 @@ class NoLoadTester:
 
         return resistance, inductance
 
-    def measure_kv(self) -> float:
-        """Measure KV by spinning motor at different velocities and calculating from back-EMF.
-
-        Returns:
-            KV in RPM/V
-        """
-        phase_resistance = self.profile.phase_resistance or self.odrv.axis.motor.config.phase_resistance
-
-        print(f"\n[KV TEST] Phase resistance: {phase_resistance * 1000:.2f} mΩ")
-
-        # Configure velocity control mode
-        print("[KV TEST] Setting velocity control mode...")
-        self.odrv.set_control_mode('velocity')
-        self.odrv.enable()
-        time.sleep(0.5)
-
-        kv_measurements = []
-
-        # Test at 4 different velocities: 5, 10, 15, 20 turns/s
-        for vel in [5, 10, 15, 20]:
-            print(f"\n[KV TEST] Testing at {vel} turns/s ({vel * 60:.0f} RPM)")
-
-            # Set velocity and wait for motor to stabilize
-            self.odrv.set_velocity(vel)
-            time.sleep(2.0)  # Allow stabilization
-
-            # Collect measurements for 1 second
-            currents, voltages, velocities = [], [], []
-            bus_currents = []
-            start = time.time()
-            while (time.time() - start) < 1.0:
-                state = self.odrv.read_state()
-                currents.append(abs(state.iq_measured))
-                bus_currents.append(abs(state.bus_current))
-                voltages.append(state.bus_voltage)
-                velocities.append(abs(state.velocity) * 60)  # Convert to RPM
-                time.sleep(0.01)
-
-            # Calculate KV from back-EMF: KV = RPM / V_bemf
-            # V_bemf = V_bus - I*R*1.5 (1.5 factor for 3-phase)
-            avg_iq = sum(currents) / len(currents)
-            avg_bus_current = sum(bus_currents) / len(bus_currents)
-            avg_voltage = sum(voltages) / len(voltages)
-            avg_velocity_rpm = sum(velocities) / len(velocities)
-
-            # For gimbal motors (Iq=0), use bus current; otherwise use Iq
-            current_for_calc = avg_bus_current if avg_iq < 0.01 else avg_iq
-            v_bemf = avg_voltage - (current_for_calc * phase_resistance * 1.5)
-
-            print(f"[KV TEST]   Avg current: {current_for_calc:.3f}A, Voltage: {avg_voltage:.2f}V")
-            print(f"[KV TEST]   Avg velocity: {avg_velocity_rpm:.1f} RPM")
-            print(f"[KV TEST]   Back-EMF: {v_bemf:.2f}V")
-
-            if v_bemf > 0.5:
-                kv = avg_velocity_rpm / v_bemf
-                kv_measurements.append(kv)
-                print(f"[KV TEST]   ✓ KV: {kv:.1f} RPM/V")
-            else:
-                print(f"[KV TEST]   ✗ Back-EMF too low, skipping")
-
-        # Stop motor
-        print("\n[KV TEST] Stopping motor...")
-        self.odrv.set_velocity(0)
-        time.sleep(1.0)
-        self.odrv.disable()
-
-        # Return average KV from all measurements
-        if kv_measurements:
-            avg_kv = sum(kv_measurements) / len(kv_measurements)
-            print(f"[KV TEST] Average KV: {avg_kv:.1f} RPM/V")
-            return avg_kv
-        else:
-            print(f"[KV TEST] WARNING: No valid measurements, using profile value")
-            return self.profile.kv_rating
 
     def measure_no_load_current(
         self,
@@ -369,15 +281,8 @@ class NoLoadTester:
         print(f"Phase resistance: {phase_resistance * 1000:.2f} mΩ")
         print(f"Phase inductance: {phase_inductance * 1e6:.2f} µH")
 
-        # Test 2: KV measurement
-        print("\n--- Test 2: KV Measurement ---")
-        kv = self.measure_kv()
-        print(f"KV: {kv:.1f} RPM/V")
-        kt_from_kv = 60.0 / (2.0 * math.pi * kv)
-        print(f"KT (from KV): {kt_from_kv:.4f} Nm/A")
-
-        # Test 3: No-load current
-        print("\n--- Test 3: No-Load Current ---")
+        # Test 2: No-load current
+        print("\n--- Test 2: No-Load Current ---")
         mean_current, std_current = self.measure_no_load_current(
             target_velocity=velocity_for_noload
         )
@@ -386,8 +291,8 @@ class NoLoadTester:
         # Wait for motor to cool/settle
         time.sleep(2.0)
 
-        # Test 4: Inertia measurement
-        print("\n--- Test 4: Inertia Measurement ---")
+        # Test 3: Inertia measurement
+        print("\n--- Test 3: Inertia Measurement ---")
         inertia, acceleration = self.measure_inertia(
             test_current=current_for_inertia
         )
@@ -399,7 +304,6 @@ class NoLoadTester:
             motor_name=self.profile.name,
             phase_resistance_ohm=phase_resistance,
             phase_inductance_mH=phase_inductance * 1000,
-            KV_rpm_per_V=kv,
             no_load_current_A=mean_current,
             no_load_current_std=std_current,
             test_velocity_turns_s=velocity_for_noload,
@@ -419,7 +323,7 @@ class NoLoadTester:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Motor No-Load Test - Measure impedance, KV, no-load current, and inertia",
+        description="Motor No-Load Test - Measure impedance, no-load current, and inertia",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -500,12 +404,16 @@ Results are automatically saved to results/<motor>_results.json
         results.update_motor_info(
             description=profile.description,
             motor_type=profile.motor_type,
-            pole_pairs=profile.pole_pairs
+            pole_pairs=profile.pole_pairs,
+            kv_rating=profile.kv_rating
         )
         results.update_electrical(
             phase_resistance_ohm=result.phase_resistance_ohm,
-            phase_inductance_mH=result.phase_inductance_mH,
-            kv_rpm_per_v=result.KV_rpm_per_V
+            phase_inductance_mH=result.phase_inductance_mH
+        )
+        results.update_mechanical(
+            no_load_current_a=result.no_load_current_A,
+            motor_inertia_kg_m2=result.motor_inertia_kg_m2
         )
         results.update_limits(
             max_current_a=profile.current_lim,

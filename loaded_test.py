@@ -2,12 +2,10 @@
 """
 Motor Loaded Test Script
 
-Measures motor constants using torque sensor and electromagnetic brake:
-    - KT: Torque constant (Nm/A)
+Measures motor performance under load using torque sensor and brake:
+    - KT: Torque constant (Nm/A), validated against spec KV
     - Thermal resistance and time constant
-    - Max torque burst performance data
-
-Note: KV and impedance are measured in no_load_test.py and read from results.
+    - Max torque burst data
 """
 
 import argparse
@@ -51,7 +49,6 @@ class LoadedTestResult:
 
     # Motor constants
     KT_Nm_per_A: float  # Measured from torque sensor
-    KV_rpm_per_V: float  # Read from no_load test for validation
 
     # Thermal parameters
     thermal_resistance_C_per_W: float
@@ -246,22 +243,20 @@ class LoadedTester:
         print(f"Bus voltage: {state.bus_voltage:.1f}V")
         print(f"Max test current: {max_current}A")
 
-        # Read KV from no_load test results
-        kv = self.results.get_kv()
-        if kv is None:
-            raise ValueError("KV not found in results. Run no_load_test.py first!")
-        print(f"\nKV (from no_load test): {kv:.1f} RPM/V")
+        # Get spec KV from motor profile
+        kv_spec = self.profile.kv_rating
+        print(f"\nKV (spec): {kv_spec:.1f} RPM/V")
 
         # Test 1: Measure KT (torque constant)
         print("\n--- Test 1: KT Measurement ---")
         kt = self.measure_kt([1.0, 2.0, 3.0, min(4.0, max_current)])
         print(f"KT (measured): {kt:.4f} Nm/A")
 
-        # Validate against theoretical KT from KV
-        kt_from_kv = 60.0 / (2.0 * math.pi * kv)
-        print(f"KT (from KV):  {kt_from_kv:.4f} Nm/A")
-        error_percent = abs(kt - kt_from_kv) / kt_from_kv * 100
-        print(f"Difference: {error_percent:.1f}%")
+        # Calculate KV from measured KT and compare to spec
+        kv_from_kt = 60.0 / (2.0 * math.pi * kt)
+        print(f"KV (from measured KT): {kv_from_kt:.1f} RPM/V")
+        error_percent = abs(kv_from_kt - kv_spec) / kv_spec * 100
+        print(f"Difference from spec: {error_percent:.1f}%")
 
         # Test 2: Thermal characterization
         thermal_resistance = 0.0
@@ -291,7 +286,6 @@ class LoadedTester:
 
         return LoadedTestResult(
             motor_name=self.profile.name,
-            KV_rpm_per_V=kv,
             KT_Nm_per_A=kt,
             thermal_resistance_C_per_W=thermal_resistance,
             thermal_time_constant_s=thermal_time_constant,

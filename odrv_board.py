@@ -119,9 +119,11 @@ class ODriveBoard:
         motor_type = MOTOR_TYPE_GIMBAL if profile.motor_type == "gimbal" else MOTOR_TYPE_HIGH_CURRENT
         self._axis.motor.config.motor_type = motor_type
         self._axis.motor.config.pole_pairs = profile.pole_pairs
+        self._axis.motor.config.torque_constant = profile.torque_constant
         self._axis.motor.config.current_lim = profile.current_lim
         self._axis.motor.config.calibration_current = profile.calibration_current
         self._axis.motor.config.requested_current_range = profile.current_lim * 1.25
+        self._log(f"  Torque constant: {profile.torque_constant:.6f} Nm/A ({profile.torque_constant*1000:.3f} mNm/A)")
 
         # Phase impedance (required for gimbal motors)
         if profile.phase_resistance and profile.phase_inductance:
@@ -146,12 +148,12 @@ class ODriveBoard:
         self._axis.motor_thermistor.config.enabled = True
         set_motor_thermistor_coeffs(self._axis, Rload=3300, R_25=10000, Beta=3435, Tmin=-10, TMax=150)
 
-        # Velocity control gains (for gimbal motors, increase gains to handle load)
-        if profile.motor_type == "gimbal":
-            # Higher gains for gimbal motors to handle brake resistance
-            self._axis.controller.config.vel_gain = 0.5
-            self._axis.controller.config.vel_integrator_gain = 1.0
-            self._log(f"  Velocity gains: P=0.5, I=1.0 (tuned for gimbal with load)")
+        # Velocity control gains and limits
+        # Use conservative gains for all motor types during testing
+        self._axis.controller.config.vel_gain = 0.02
+        self._axis.controller.config.vel_integrator_gain = 0.1
+        self._axis.controller.config.vel_limit = 50.0
+        self._log(f"  Velocity control: P=0.02, I=0.1, limit=50 turns/s")
 
         self._log(f"  Type: {profile.motor_type}, Poles: {profile.pole_pairs}")
     
@@ -231,6 +233,17 @@ class ODriveBoard:
             self.print_errors()
             raise CalibrationError("Encoder calibration failed")
 
+        # Verify axis is ready for closed-loop control
+        if not self._axis.motor.is_calibrated:
+            self.print_errors()
+            raise CalibrationError("Motor not calibrated")
+        if not self._axis.encoder.is_ready:
+            self.print_errors()
+            raise CalibrationError("Encoder not ready")
+        if self._axis.error:
+            self.print_errors()
+            raise CalibrationError(f"Axis error after calibration: {self._axis.error}")
+
         self._log("Calibration complete")
     
     def _run_state(self, state: int, timeout: float) -> None:
@@ -248,19 +261,18 @@ class ODriveBoard:
     def enable(self, timeout: float = 2.0) -> None:
         self.clear_errors()
         self._axis.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-        
-        # Wait for axis to enter closed-loop control
+
         start = time.time()
         while self._axis.current_state != AXIS_STATE_CLOSED_LOOP_CONTROL:
             if time.time() - start > timeout:
-                self._log(f"Warning: Timeout waiting for closed-loop control (state={self._axis.current_state})")
-                break
+                self.print_errors()
+                raise RuntimeError(f"Enable timeout (state={self._axis.current_state})")
             if self._axis.error:
-                self._log(f"Warning: Axis error during enable: {self._axis.error}")
-                break
+                self.print_errors()
+                raise RuntimeError(f"Axis error during enable: {self._axis.error}")
             time.sleep(0.01)
-        
-        self._log(f"Axis state: {self._axis.current_state}")
+
+        self._log(f"Enabled")
     
     def disable(self) -> None:
         self._axis.requested_state = AXIS_STATE_IDLE

@@ -40,7 +40,9 @@ class MotorTestResults:
                 "description": "",
                 "motor_type": "",
                 "pole_pairs": 0,
+                "kv_rating": 0,
                 "electrical": {},
+                "mechanical": {},
                 "thermal": {},
                 "limits": {},
                 "test_history": {
@@ -50,7 +52,7 @@ class MotorTestResults:
             }
 
     def update_motor_info(self, description: str = None, motor_type: str = None,
-                         pole_pairs: int = None):
+                         pole_pairs: int = None, kv_rating: float = None):
         """Update basic motor information."""
         if description:
             self.data["description"] = description
@@ -58,20 +60,34 @@ class MotorTestResults:
             self.data["motor_type"] = motor_type
         if pole_pairs:
             self.data["pole_pairs"] = pole_pairs
+        if kv_rating is not None:
+            self.data["kv_rating"] = kv_rating
 
     def update_electrical(self, phase_resistance_ohm: float = None,
                          phase_inductance_mH: float = None,
-                         kv_rpm_per_v: float = None,
                          kt_nm_per_a: float = None):
         """Update electrical parameters."""
         if phase_resistance_ohm is not None:
             self.data["electrical"]["phase_resistance_ohm"] = phase_resistance_ohm
         if phase_inductance_mH is not None:
             self.data["electrical"]["phase_inductance_mH"] = phase_inductance_mH
-        if kv_rpm_per_v is not None:
-            self.data["electrical"]["KV_rpm_per_V"] = kv_rpm_per_v
         if kt_nm_per_a is not None:
             self.data["electrical"]["KT_Nm_per_A"] = kt_nm_per_a
+            # Calculate KV from KT and add comparison to spec
+            kv_from_kt = 60.0 / (2.0 * 3.14159265359 * kt_nm_per_a)
+            self.data["electrical"]["KV_from_KT_rpm_per_V"] = kv_from_kt
+            if self.data.get("kv_rating"):
+                kv_spec = self.data["kv_rating"]
+                error_percent = abs(kv_from_kt - kv_spec) / kv_spec * 100
+                self.data["electrical"]["KV_error_percent"] = error_percent
+
+    def update_mechanical(self, no_load_current_a: float = None,
+                         motor_inertia_kg_m2: float = None):
+        """Update mechanical parameters."""
+        if no_load_current_a is not None:
+            self.data["mechanical"]["no_load_current_A"] = no_load_current_a
+        if motor_inertia_kg_m2 is not None:
+            self.data["mechanical"]["motor_inertia_kg_m2"] = motor_inertia_kg_m2
 
     def update_thermal(self, thermal_resistance_c_per_w: float = None,
                       thermal_time_constant_s: float = None):
@@ -116,10 +132,6 @@ class MotorTestResults:
         self.data["last_updated"] = timestamp
         self.data["bus_voltage_V"] = bus_voltage_v
 
-    def get_kv(self) -> Optional[float]:
-        """Get KV value from results (measured in no-load test)."""
-        return self.data.get("electrical", {}).get("KV_rpm_per_V")
-
     def get_kt(self) -> Optional[float]:
         """Get KT value from results (measured in loaded test)."""
         return self.data.get("electrical", {}).get("KT_Nm_per_A")
@@ -162,10 +174,24 @@ class MotorTestResults:
                 lines.append(f"  R: {elec['phase_resistance_ohm']*1000:.2f} mΩ")
             if "phase_inductance_mH" in elec:
                 lines.append(f"  L: {elec['phase_inductance_mH']*1000:.2f} µH")
-            if "KV_rpm_per_V" in elec:
-                lines.append(f"  KV: {elec['KV_rpm_per_V']:.1f} RPM/V")
             if "KT_Nm_per_A" in elec:
                 lines.append(f"  KT: {elec['KT_Nm_per_A']:.4f} Nm/A")
+            if "KV_from_KT_rpm_per_V" in elec:
+                kv_from_kt = elec['KV_from_KT_rpm_per_V']
+                lines.append(f"  KV (from KT): {kv_from_kt:.1f} RPM/V")
+                if "KV_error_percent" in elec and self.data.get("kv_rating"):
+                    kv_spec = self.data["kv_rating"]
+                    error = elec['KV_error_percent']
+                    lines.append(f"  KV (spec): {kv_spec:.1f} RPM/V (error: {error:.1f}%)")
+
+        if "mechanical" in self.data and self.data["mechanical"]:
+            lines.append("")
+            lines.append("Mechanical:")
+            mech = self.data["mechanical"]
+            if "no_load_current_A" in mech:
+                lines.append(f"  No-load current: {mech['no_load_current_A']:.4f} A")
+            if "motor_inertia_kg_m2" in mech:
+                lines.append(f"  Inertia: {mech['motor_inertia_kg_m2']:.6e} kg·m²")
 
         if "thermal" in self.data and self.data["thermal"]:
             lines.append("")

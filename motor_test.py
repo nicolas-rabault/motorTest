@@ -65,7 +65,7 @@ def run_no_load_test(profile: MotorProfile, args) -> None:
     print("  ✓ Motor connected to ODrive")
     print("  ✓ Motor shaft is FREE TO SPIN")
     print("  ✓ NO brake attached")
-    print("  ✓ NO torque sensor needed")
+    print("  ✓ NO torque sensor attached")
     print("  ✓ Power supply connected to ODrive")
 
     if not wait_for_user("Ready to start no-load test?"):
@@ -81,7 +81,11 @@ def run_no_load_test(profile: MotorProfile, args) -> None:
     odrv.connect(serial_number=args.odrive_port)
     print(f"Connected. Bus voltage: {odrv.read_bus_voltage():.1f}V")
 
-    # Load profile, save, reboot, then calibrate
+    # Erase old configuration, load profile, save, reboot
+    print("Erasing old configuration...")
+    odrv.erase_configuration()
+    time.sleep(2)
+    odrv.connect(serial_number=args.odrive_port)
     print("Configuring ODrive...")
     odrv.load_profile(profile)
     odrv.save_configuration()
@@ -107,12 +111,16 @@ def run_no_load_test(profile: MotorProfile, args) -> None:
     results.update_motor_info(
         description=profile.description,
         motor_type=profile.motor_type,
-        pole_pairs=profile.pole_pairs
+        pole_pairs=profile.pole_pairs,
+        kv_rating=profile.kv_rating
     )
     results.update_electrical(
         phase_resistance_ohm=result.phase_resistance_ohm,
-        phase_inductance_mH=result.phase_inductance_mH,
-        kv_rpm_per_v=result.KV_rpm_per_V
+        phase_inductance_mH=result.phase_inductance_mH
+    )
+    results.update_mechanical(
+        no_load_current_a=result.no_load_current_A,
+        motor_inertia_kg_m2=result.motor_inertia_kg_m2
     )
     results.update_limits(
         max_current_a=profile.current_lim,
