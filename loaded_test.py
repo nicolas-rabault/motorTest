@@ -79,23 +79,31 @@ class LoadedTester:
         self.brake = brake
         self.results = results
 
-    def measure_kt(self, test_currents: List[float]) -> float:
-        """Measure torque constant KT using torque sensor. KT = τ / Iq"""
-        # Warm up torque sensor buffer before starting test
-        print("  Warming up torque sensor...")
-        warmup_count = 0
-        for _ in range(200):
+    def measure_kt(self, test_currents: List[float]) -> tuple[float, float]:
+        """Measure torque constant KT using torque sensor. Returns (KT, zero_offset)."""
+        # Step 1: Measure sensor zero offset with no load
+        print("  Measuring sensor zero offset...")
+        self.brake.release()
+        self.odrv.disable()
+        time.sleep(1.0)
+
+        self.torque_sensor.flush_old_data()
+        zero_readings = []
+        for _ in range(50):
             data = self.torque_sensor.read()
             if data:
-                warmup_count += 1
-            time.sleep(0.001)
-        print(f"  Sensor warmup: {warmup_count}/200 valid reads")
+                zero_readings.append(data.torque)
+            time.sleep(0.02)
 
-        if warmup_count == 0:
-            raise RuntimeError("Torque sensor not responding - no data received during warmup")
+        if len(zero_readings) == 0:
+            raise RuntimeError("Torque sensor not responding during zero calibration")
 
-        # Enable brake at 50% intensity to create load, then configure torque control mode
-        self.brake.set_intensity(50.0)
+        zero_offset = sum(zero_readings) / len(zero_readings)
+        print(f"  Zero offset: {zero_offset:.4f} Nm (will be compensated)")
+
+        # Step 2: Enable brake at 100% intensity to fully lock motor
+        print("  Engaging brake at 100%...")
+        self.brake.set_intensity(100.0)
         self.brake.enable()
         time.sleep(1.0)
         
@@ -131,11 +139,17 @@ class LoadedTester:
 
         # Test at each current level (typically 1A, 2A, 3A, 4A)
         for current in test_currents:
-            # Apply test current and wait for torque to stabilize
+            # Apply test current
             expected_torque = current * self.profile.torque_constant
             self.odrv.set_current(current)
-            time.sleep(1.5)  # Increased wait time for torque to stabilize
-            
+
+            # Wait for mechanical torque to stabilize
+            time.sleep(1.5)
+
+            # Flush old buffered sensor data accumulated during stabilization
+            # Aggressive multi-stage flush ensures we get fresh data
+            self.torque_sensor.flush_old_data()
+
             # Verify the input torque was set correctly
             actual_input_torque = self.odrv.axis.controller.input_torque
             if abs(actual_input_torque - expected_torque) > 0.001:
@@ -143,13 +157,21 @@ class LoadedTester:
 
             # Collect torque and current measurements for 2 seconds
             torques, currents, velocities, positions = [], [], [], []
+            timestamps = []
+            raw_torques = []  # Track raw values for debugging
             start = time.time()
             while (time.time() - start) < 2.0:
+                # Read fresh torque data (read() drains buffer automatically)
                 sensor_data = self.torque_sensor.read()
-                if sensor_data:
-                    torques.append(sensor_data.torque)
-
                 state = self.odrv.read_state()
+
+                if sensor_data:
+                    # Apply zero offset compensation
+                    compensated_torque = sensor_data.torque - zero_offset
+                    torques.append(compensated_torque)
+                    timestamps.append(sensor_data.timestamp)
+                    raw_torques.append(sensor_data.torque)
+
                 currents.append(state.iq_measured)
                 velocities.append(state.velocity)
                 positions.append(state.position)
@@ -166,8 +188,29 @@ class LoadedTester:
             avg_velocity = sum(velocities) / len(velocities)
             position_change = max(positions) - min(positions)
 
+            # Calculate data freshness (how old is sensor data)
+            now = time.time()
+            data_ages = [(now - ts) * 1000 for ts in timestamps]  # ms
+            avg_age = sum(data_ages) / len(data_ages)
+            max_age = max(data_ages)
+
+            # Show detailed debug for first measurement
+            if current == test_currents[0]:
+                print(f"  [DEBUG] Raw torques: min={min(raw_torques):.4f}, max={max(raw_torques):.4f}, avg={sum(raw_torques)/len(raw_torques):.4f}")
+                print(f"  [DEBUG] Zero offset: {zero_offset:.4f} Nm")
+                print(f"  [DEBUG] Data age: avg={avg_age:.1f}ms, max={max_age:.1f}ms")
+                print(f"  [DEBUG] First 5 raw values: {[f'{t:.4f}' for t in raw_torques[:5]]}")
+                print(f"  [DEBUG] First 5 compensated: {[f'{t:.4f}' for t in torques[:5]]}")
+
             print(f"  {current}A: torque={avg_torque:.4f} Nm, current={avg_current:.2f} A, "
-                  f"vel={avg_velocity:.3f} turns/s, pos_delta={position_change:.4f} turns, samples={len(torques)}")
+                  f"vel={avg_velocity:.3f} turns/s, pos_delta={position_change:.4f} turns, samples={len(torques)}, age={avg_age:.0f}ms")
+
+            # Verify motor is locked (not spinning)
+            if abs(avg_velocity) > 0.05:
+                print(f"  ⚠️  WARNING: Motor spinning at {abs(avg_velocity):.3f} turns/s - brake not holding!")
+                print(f"     Measurement may be inaccurate (dynamic friction, not static torque)")
+            elif position_change > 0.002:
+                print(f"  ⚠️  WARNING: Motor creeping ({position_change:.4f} turns) - brake marginally holding")
 
             if abs(avg_current) > 0.1:
                 kt_measurements.append(abs(avg_torque) / abs(avg_current))
@@ -184,8 +227,9 @@ class LoadedTester:
                 "Check torque sensor connection and ensure it's receiving data."
             )
 
-        # Return average KT from all measurements
-        return sum(kt_measurements) / len(kt_measurements)
+        # Return average KT and the zero offset
+        avg_kt = sum(kt_measurements) / len(kt_measurements)
+        return avg_kt, zero_offset
     
     def measure_thermal_parameters(self, test_current: float, heating_duration: float) -> ThermalTestData:
         """Measure thermal resistance and time constant."""
@@ -246,7 +290,7 @@ class LoadedTester:
             time_constant_s=time_constant
         )
     
-    def run_torque_burst_test(self, max_current: float) -> List[TorqueBurstDataPoint]:
+    def run_torque_burst_test(self, max_current: float, zero_offset: float = 0.0) -> List[TorqueBurstDataPoint]:
         """Run max torque burst test and record high-speed data."""
         # Enable brake at 100% intensity to fully lock motor shaft
         self.brake.set_intensity(100.0)
@@ -260,13 +304,14 @@ class LoadedTester:
         time.sleep(0.1)
         self.odrv.enable()
 
-        # Warm up torque sensor buffer with dummy reads
-        for _ in range(100):
-            self.torque_sensor.read()
+        # Aggressively flush old data before burst test
+        self.torque_sensor.flush_old_data()
+        time.sleep(0.01)  # Brief pause after flush
 
-        # Apply maximum current burst and record data at 1kHz for 100ms
+        # Apply maximum current burst and record data at ~300Hz for 100ms
+        # (1kHz is too fast for both USB devices, 300Hz is reliable)
         data_points = []
-        sample_interval = 0.001
+        sample_interval = 0.003  # 3ms = ~333Hz
         start_time = time.time()
         self.odrv.set_current(max_current)
 
@@ -274,14 +319,17 @@ class LoadedTester:
             loop_start = time.time()
             elapsed_ms = (loop_start - start_time) * 1000.0
 
-            # Read torque sensor and ODrive state simultaneously
+            # Read torque sensor and ODrive state
             sensor_data = self.torque_sensor.read()
             state = self.odrv.read_state()
+
+            # Apply zero offset compensation to torque reading
+            compensated_torque = (sensor_data.torque - zero_offset) if sensor_data else 0.0
 
             # Record all data for this sample point
             data_points.append(TorqueBurstDataPoint(
                 timestamp_ms=elapsed_ms,
-                measured_torque_Nm=sensor_data.torque if sensor_data else 0.0,
+                measured_torque_Nm=compensated_torque,
                 estimated_torque_Nm=state.torque_estimate,
                 current_A=state.iq_measured,
                 velocity_turns_s=state.velocity,
@@ -291,7 +339,7 @@ class LoadedTester:
                 measured_speed_RPM=sensor_data.speed if sensor_data else 0
             ))
 
-            # Sleep to maintain 1kHz sample rate
+            # Sleep to maintain target sample rate
             elapsed = time.time() - loop_start
             if elapsed < sample_interval:
                 time.sleep(sample_interval - elapsed)
@@ -320,7 +368,7 @@ class LoadedTester:
 
         # Test 1: Measure KT (torque constant)
         print("\n--- Test 1: KT Measurement ---")
-        kt = self.measure_kt([1.0, 2.0, 3.0, min(4.0, max_current)])
+        kt, zero_offset = self.measure_kt([2.0, 3.0, 4.0, min(5.0, max_current)])
         print(f"KT (measured): {kt:.4f} Nm/A")
 
         # Check if KT measurement is valid
@@ -356,7 +404,7 @@ class LoadedTester:
 
         # Test 3: Max torque burst
         print("\n--- Test 3: Torque Burst (100ms) ---")
-        burst_data = self.run_torque_burst_test(max_current)
+        burst_data = self.run_torque_burst_test(max_current, zero_offset)
         if burst_data:
             avg_measured_torque = sum(d.measured_torque_Nm for d in burst_data) / len(burst_data)
             avg_current = sum(d.current_A for d in burst_data) / len(burst_data)
