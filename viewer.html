@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Motor Test Results Viewer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -640,6 +642,13 @@
 
                     <div class="chart-container">
                         <canvas id="burstChart"></canvas>
+                        <div style="text-align: center; margin-top: 10px; color: #666; font-size: 0.9rem;">
+                            💡 <strong>Tip:</strong> Mouse wheel to zoom, drag to pan, double-click to reset
+                        </div>
+                    </div>
+
+                    <div class="chart-container" style="height: 250px; margin-top: 20px;">
+                        <canvas id="tempChart"></canvas>
                     </div>
                 </div>
             `;
@@ -658,8 +667,8 @@
                 burstChart.destroy();
             }
 
-            // Prepare data
-            const labels = data.map(d => d.timestamp_ms.toFixed(1));
+            // Prepare data - use time_relative_ms for x-axis
+            const labels = data.map(d => d.time_relative_ms.toFixed(1));
             const measuredTorque = data.map(d => d.measured_torque_Nm * 1000); // Convert to mNm
             const estimatedTorque = data.map(d => d.estimated_torque_Nm * 1000); // Convert to mNm
             const current = data.map(d => d.current_A);
@@ -747,6 +756,27 @@
                                     return label;
                                 }
                             }
+                        },
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                    speed: 0.1
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'xy',
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy',
+                            },
+                            limits: {
+                                x: {min: 'original', max: 'original'},
+                                y: {min: 'original', max: 'original'},
+                                y1: {min: 'original', max: 'original'}
+                            }
                         }
                     },
                     scales: {
@@ -754,7 +784,7 @@
                             display: true,
                             title: {
                                 display: true,
-                                text: 'Time (ms)',
+                                text: 'Time Relative to Burst Start (ms)',
                                 font: {
                                     size: 14,
                                     weight: 'bold'

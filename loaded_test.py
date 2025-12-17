@@ -11,6 +11,7 @@ Measures motor performance under load using torque sensor and brake:
 import argparse
 import math
 import time
+import threading
 import numpy as np
 from dataclasses import dataclass, asdict, field
 from typing import List, Optional, Dict, Any
@@ -26,7 +27,8 @@ from test_results import MotorTestResults
 @dataclass
 class TorqueBurstDataPoint:
     """Single data point during torque burst test."""
-    timestamp_ms: float  # Time from burst start (ms)
+    timestamp_s: float  # Absolute timestamp (seconds since epoch)
+    time_relative_ms: float  # Time relative to burst start (ms)
     measured_torque_Nm: float  # From torque sensor
     estimated_torque_Nm: float  # From ODrive (Kt * Iq)
     current_A: float  # Iq measured
@@ -235,64 +237,115 @@ class LoadedTester:
             time_constant_s=time_constant
         )
     
-    def run_torque_burst_test(self, max_current: float, zero_offset: float = 0.0) -> List[TorqueBurstDataPoint]:
-        """Run max torque burst test and record high-speed data."""
-        # Enable brake at 100% intensity to fully lock motor shaft
+    def run_torque_burst_test(
+        self,
+        max_current: float,
+        zero_offset: float = 0.0,
+        pre_burst_ms: float = 300.0,
+        burst_duration_ms: float = 100.0,
+        post_burst_ms: float = 300.0
+    ) -> List[TorqueBurstDataPoint]:
+        """Run max torque burst test with pre/post capture for time alignment."""
         self.brake.set_intensity(100.0)
         self.brake.enable()
         time.sleep(0.5)
 
-        # Configure torque control mode and enable
         self.odrv.disable()
         time.sleep(0.1)
         self.odrv.set_control_mode('torque')
         time.sleep(0.1)
         self.odrv.enable()
+        time.sleep(0.2)
 
-        # Apply maximum current burst for 100ms
+        # Collect ODrive data in parallel
+        odrv_samples = []
+        collecting = [True]
+
+        def collect_odrv():
+            while collecting[0]:
+                odrv_samples.append((time.time(), self.odrv.read_state()))
+                time.sleep(0.003)
+
+        thread = threading.Thread(target=collect_odrv)
+        thread.start()
+
+        time.sleep(pre_burst_ms / 1000.0)
+
         self.odrv.set_current(max_current)
-        time.sleep(0.1)
+        time.sleep(burst_duration_ms / 1000.0)
         self.odrv.set_current(0)
 
-        # Get torque sensor data from the burst (last 100ms)
-        sensor_samples = self.torque_sensor.read_range(0.1)
+        time.sleep(post_burst_ms / 1000.0)
 
-        # Get ODrive state samples (sample every 3ms for ~33 points)
-        odrv_samples = []
-        elapsed = 0.0
-        for _ in range(33):
-            state = self.odrv.read_state()
-            odrv_samples.append((elapsed * 1000, state))
-            elapsed += 0.003
-            if elapsed > 0.1:
-                break
+        collecting[0] = False
+        thread.join()
 
-        # Merge sensor and ODrive data (match by timestamp)
+        # Get sensor data
+        total_duration_s = (pre_burst_ms + burst_duration_ms + post_burst_ms) / 1000.0
+        sensor_samples = self.torque_sensor.read_range(total_duration_s)
+
+        # Align timestamps by matching burst start and end using derivatives
+        sensor_times = np.array([s.timestamp for s in reversed(sensor_samples)])
+        sensor_torques = np.array([abs(s.torque - zero_offset) for s in reversed(sensor_samples)])
+
+        odrv_times = np.array([t for t, _ in odrv_samples])
+        kt = self.results.data.get("electrical", {}).get("KT_Nm_per_A")
+        odrv_torques = np.array([abs(s.iq_measured * kt) if kt else abs(s.torque_estimate)
+                                for _, s in odrv_samples])
+
+        # Compute derivatives (rate of change)
+        sensor_dt = np.gradient(sensor_torques, sensor_times)
+        odrv_dt = np.gradient(odrv_torques, odrv_times)
+
+        # Find burst start (maximum derivative - rising edge)
+        sensor_start_idx = np.argmax(sensor_dt)
+        odrv_start_idx = np.argmax(odrv_dt)
+
+        # Find burst end (minimum derivative - falling edge)
+        sensor_end_idx = np.argmin(sensor_dt)
+        odrv_end_idx = np.argmin(odrv_dt)
+
+        # Calculate time scaling factor to match burst durations
+        sensor_burst_duration = sensor_times[sensor_end_idx] - sensor_times[sensor_start_idx]
+        odrv_burst_duration = odrv_times[odrv_end_idx] - odrv_times[odrv_start_idx]
+        time_scale = odrv_burst_duration / sensor_burst_duration if sensor_burst_duration > 0 else 1.0
+
+        # Align and scale sensor timestamps to match ODrive timing
+        # This corrects for time offset and data rate differences
+        aligned_sensor_times = (sensor_times - sensor_times[sensor_start_idx]) * time_scale + odrv_times[odrv_start_idx]
+
+        # Merge data - each sensor sample gets ODrive data from closest time
         data_points = []
-        burst_start = time.time() - 0.1
+        for i, sample in enumerate(reversed(sensor_samples)):
+            sensor_time_aligned = aligned_sensor_times[i]
 
-        for elapsed_ms, state in odrv_samples:
-            # Find closest sensor sample to this ODrive sample
-            target_time = burst_start + (elapsed_ms / 1000.0)
-            closest = min(sensor_samples, key=lambda s: abs(s.timestamp - target_time))
+            # Find closest ODrive sample
+            closest_odrv = min(odrv_samples, key=lambda x: abs(x[0] - sensor_time_aligned))
+            odrv_time, state = closest_odrv
+
+            # Calculate relative time from ODrive timestamp (not sensor)
+            relative_time_ms = (odrv_time - odrv_times[odrv_start_idx]) * 1000.0
+
+            # Use KT * current for estimated torque
+            estimated_torque = abs(state.iq_measured * kt) if kt else abs(state.torque_estimate)
 
             data_points.append(TorqueBurstDataPoint(
-                timestamp_ms=elapsed_ms,
-                measured_torque_Nm=closest.torque - zero_offset,
-                estimated_torque_Nm=state.torque_estimate,
-                current_A=state.iq_measured,
+                timestamp_s=odrv_time,
+                time_relative_ms=relative_time_ms,
+                measured_torque_Nm=abs(sample.torque - zero_offset),
+                estimated_torque_Nm=estimated_torque,
+                current_A=abs(state.iq_measured),
                 velocity_turns_s=state.velocity,
                 position_turns=state.position,
                 motor_temperature_C=state.motor_temperature,
                 bus_voltage_V=state.bus_voltage,
-                measured_speed_RPM=closest.speed
+                measured_speed_RPM=sample.speed
             ))
 
-        # Stop motor, disable, and release brake
         self.odrv.disable()
         self.brake.release()
 
-        return data_points
+        return sorted(data_points, key=lambda d: d.time_relative_ms)
     
     def run_full_test(self, max_current: float, skip_thermal: bool, thermal_duration: float) -> LoadedTestResult:
         """Run complete loaded motor test sequence (KT, thermal, burst)."""
