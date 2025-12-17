@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Test Results Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .motor-selector {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .motor-selector label {
+            font-weight: 500;
+            font-size: 1.1rem;
+        }
+
+        select {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+
+        select:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+        select:focus {
+            outline: 3px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+            overflow: visible;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            color: #1e3c72;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 18px;
+            font-size: 12px;
+            cursor: help;
+            position: relative;
+        }
+
+        .info-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 25px;
+            top: -5px;
+            background: #1e3c72;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            max-width: 300px;
+            font-size: 13px;
+            z-index: 1000;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            line-height: 1.4;
+        }
+
+        .card-tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            margin-top: 8px;
+            background: #1e3c72;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            max-width: 280px;
+            width: max-content;
+            font-size: 12px;
+            z-index: 10000;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        .card-tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            overflow: visible;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            transition: all 0.3s;
+            position: relative;
+            overflow: visible;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.12);
+            z-index: 100;
+        }
+
+        .card-label {
+            font-size: 0.85rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+
+        .card-unit {
+            font-size: 0.9rem;
+            color: #999;
+        }
+
+        .card-description {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 15px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-gimbal {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-high-current {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .test-history {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .test-entry {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid #667eea;
+        }
+
+        .test-type {
+            font-weight: 600;
+            color: #1e3c72;
+        }
+
+        .test-time {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-style: italic;
+        }
+
+        .info-panel {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .info-panel h3 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+        }
+
+        .info-panel p {
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .info-panel ul {
+            margin-left: 20px;
+            line-height: 1.8;
+            color: #555;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #c62828;
+        }
+
+        .highlight-positive {
+            color: #2e7d32;
+        }
+
+        .highlight-warning {
+            color: #f57c00;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .compact-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .overview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                text-align: center;
+                justify-content: center;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+
+        .burst-test-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            overflow: visible;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            position: relative;
+            overflow: visible;
+        }
+
+        .summary-card:hover {
+            z-index: 100;
+        }
+
+        .summary-card-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .summary-card-label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <span>⚡</span>
+                <span>Motor Test Results Viewer</span>
+            </h1>
+            <div class="motor-selector">
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <button id="loadFileBtn" style="padding: 12px 30px; font-size: 1rem; border: none; border-radius: 8px; background: white; color: #333; cursor: pointer; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s; font-weight: 500;">
+                    📁 Load Result File
+                </button>
+            </div>
+        </header>
+
+        <div class="content" id="content">
+            <div class="loading">Loading motor data...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentMotorData = null;
+        let burstChart = null;
+
+        // Handle file selection
+        document.getElementById('loadFileBtn').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    currentMotorData = data;
+                    displayMotorData(data);
+                } catch (error) {
+                    document.getElementById('content').innerHTML = `
+                        <div class="error">
+                            <strong>Error parsing JSON file:</strong> ${error.message}
+                        </div>
+                    `;
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Display motor data
+        function displayMotorData(data) {
+            if (!data) return;
+
+            const content = document.getElementById('content');
+
+            content.innerHTML = `
+                <div class="overview-grid">
+                    <div class="section">
+                        <div class="section-title">📋 Motor Overview</div>
+                        <div class="cards-grid">
+                            <div class="card card-tooltip" data-tooltip="Motor model name and identification">
+                                <div class="card-label">Motor Name</div>
+                                <div class="card-value" style="font-size: 1.3rem;">${data.name}</div>
+                                <div class="card-description">${data.description || 'N/A'}</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Motor category:&#10;• Gimbal: High resistance, low current&#10;• High Current: Low resistance, high torque">
+                                <div class="card-label">Motor Type</div>
+                                <div class="card-value" style="font-size: 1.3rem;">
+                                    <span class="badge badge-${data.motor_type}">${data.motor_type || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Number of magnetic pole pairs in motor.&#10;Affects electrical vs mechanical rotation.&#10;1 electrical rev = ${data.pole_pairs || 'N'} mechanical revs">
+                                <div class="card-label">Pole Pairs</div>
+                                <div class="card-value">${data.pole_pairs || 'N/A'}</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Manufacturer's rated velocity constant.&#10;Motor RPM per volt with no load.&#10;Compare with measured KV for validation.">
+                                <div class="card-label">KV Rating</div>
+                                <div class="card-value">${data.kv_rating || 'N/A'}</div>
+                                <div class="card-unit">RPM/V</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="DC power supply voltage during testing.&#10;All measurements taken at this voltage.&#10;Affects speed and torque characteristics.">
+                                <div class="card-label">⚡ Bus Voltage</div>
+                                <div class="card-value">${data.bus_voltage_V ? data.bus_voltage_V.toFixed(2) : 'N/A'}</div>
+                                <div class="card-unit">Volts</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${data.image_url ? `
+                    <div class="section" style="display: flex; align-items: center; justify-content: center; padding: 15px;">
+                        <img src="${data.image_url}" alt="${data.name}" style="max-width: 100%; max-height: 350px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); object-fit: contain;">
+                    </div>
+                    ` : `
+                    <div class="section" style="display: flex; align-items: center; justify-content: center; padding: 40px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
+                        <div style="text-align: center; color: #666;">
+                            <div style="font-size: 3rem; margin-bottom: 10px;">📷</div>
+                            <div style="font-size: 1rem;">No image available</div>
+                        </div>
+                    </div>
+                    `}
+                </div>
+
+                ${generateElectricalSection(data)}
+                ${generateBurstTestSection(data)}
+                ${generateInfoPanel()}
+            `;
+
+            // Render burst test chart if data exists
+            if (data.torque_burst_test && data.torque_burst_test.data && data.torque_burst_test.data.length > 0) {
+                renderBurstTestChart(data.torque_burst_test.data);
+            }
+        }
+
+        function generateElectricalSection(data) {
+            const elec = data.electrical || {};
+            const mech = data.mechanical || {};
+            const limits = data.limits || {};
+            return `
+                <div class="compact-grid">
+                    <div class="section">
+                        <div class="section-title">
+                            🔌 Electrical
+                            <span class="info-icon" data-tooltip="Motor electrical parameters">i</span>
+                        </div>
+                        <div class="cards-grid">
+                            <div class="card card-tooltip" data-tooltip="Electrical resistance of motor windings per phase.&#10;Lower resistance = less heat, more efficient.&#10;Measured in milliohms (mΩ).">
+                                <div class="card-label">Phase Resistance</div>
+                                <div class="card-value">${elec.phase_resistance_ohm ? (elec.phase_resistance_ohm * 1000).toFixed(2) : 'N/A'}</div>
+                                <div class="card-unit">mΩ</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Winding inductance per phase.&#10;Affects how quickly current can change.&#10;Higher inductance = smoother but slower response.">
+                                <div class="card-label">Phase Inductance</div>
+                                <div class="card-value">${elec.phase_inductance_mH ? elec.phase_inductance_mH.toFixed(3) : 'N/A'}</div>
+                                <div class="card-unit">mH</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Torque Constant - torque produced per ampere.&#10;Higher KT = more torque per amp.&#10;Fundamental motor parameter for control.">
+                                <div class="card-label">KT (Torque Constant)</div>
+                                <div class="card-value">${elec.KT_Nm_per_A ? (elec.KT_Nm_per_A * 1000).toFixed(2) : 'N/A'}</div>
+                                <div class="card-unit">mNm/A</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Velocity Constant - motor RPM per volt.&#10;Calculated from KT measurement.&#10;Compare with manufacturer's rated KV.">
+                                <div class="card-label">KV from KT</div>
+                                <div class="card-value">${elec.KV_from_KT_rpm_per_V ? Math.round(elec.KV_from_KT_rpm_per_V) : (elec.KV_rpm_per_V ? Math.round(elec.KV_rpm_per_V) : 'N/A')}</div>
+                                <div class="card-unit">RPM/V</div>
+                            </div>
+                            ${elec.KV_error_percent !== undefined ? `
+                            <div class="card card-tooltip" data-tooltip="Difference between measured and rated KV.&#10;<20% is good accuracy.&#10;>20% may indicate measurement error or&#10;manufacturer specification variance.">
+                                <div class="card-label">KV Error</div>
+                                <div class="card-value ${Math.abs(elec.KV_error_percent) > 20 ? 'highlight-warning' : 'highlight-positive'}">
+                                    ${elec.KV_error_percent.toFixed(1)}
+                                </div>
+                                <div class="card-unit">%</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">
+                            ⚙️ Mechanical & Limits
+                            <span class="info-icon" data-tooltip="Mechanical properties and current limits">i</span>
+                        </div>
+                        <div class="cards-grid">
+                            <div class="card card-tooltip" data-tooltip="Current needed to spin motor freely.&#10;Represents friction and bearing losses.&#10;Lower is better for efficiency.">
+                                <div class="card-label">No-Load Current</div>
+                                <div class="card-value">${mech.no_load_current_A ? (mech.no_load_current_A * 1000).toFixed(0) : 'N/A'}</div>
+                                <div class="card-unit">mA</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Rotational inertia of motor rotor.&#10;Resistance to angular acceleration.&#10;Important for dynamic response calculations.">
+                                <div class="card-label">Motor Inertia</div>
+                                <div class="card-value">${mech.motor_inertia_kg_m2 ? (mech.motor_inertia_kg_m2 * 1e6).toFixed(2) : 'N/A'}</div>
+                                <div class="card-unit">g·cm²</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Maximum safe continuous current.&#10;Exceeding may cause overheating or damage.&#10;Used as safety limit in tests.">
+                                <div class="card-label">Max Current</div>
+                                <div class="card-value">${limits.max_current_A || 'N/A'}</div>
+                                <div class="card-unit">A</div>
+                            </div>
+                            <div class="card card-tooltip" data-tooltip="Current used during motor calibration.&#10;Set below max current for safety.&#10;Used to measure resistance and inductance.">
+                                <div class="card-label">Calibration Current</div>
+                                <div class="card-value">${limits.calibration_current_A || 'N/A'}</div>
+                                <div class="card-unit">A</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generateMechanicalSection(data) {
+            // Now combined with electrical section
+            return '';
+        }
+
+        function generateBurstTestSection(data) {
+            const burst = data.torque_burst_test;
+            if (!burst || !burst.data || burst.data.length === 0) {
+                return `
+                    <div class="section">
+                        <div class="section-title">
+                            📊 Torque Burst Test
+                            <span class="info-icon" data-tooltip="High-current torque measurement">i</span>
+                        </div>
+                        <div class="no-data">No burst test data available for this motor</div>
+                    </div>
+                `;
+            }
+
+            // Calculate summary statistics
+            const measuredTorques = burst.data.map(d => d.measured_torque_Nm).filter(t => !isNaN(t));
+            const estimatedTorques = burst.data.map(d => d.estimated_torque_Nm).filter(t => !isNaN(t));
+            const currents = burst.data.map(d => d.current_A).filter(c => !isNaN(c));
+
+            const avgMeasuredTorque = measuredTorques.length > 0 ?
+                measuredTorques.reduce((a, b) => a + b, 0) / measuredTorques.length : 0;
+            const avgEstimatedTorque = estimatedTorques.length > 0 ?
+                estimatedTorques.reduce((a, b) => a + b, 0) / estimatedTorques.length : 0;
+            const avgCurrent = currents.length > 0 ?
+                currents.reduce((a, b) => a + b, 0) / currents.length : 0;
+            const maxMeasuredTorque = measuredTorques.length > 0 ? Math.max(...measuredTorques) : 0;
+
+            return `
+                <div class="section">
+                    <div class="section-title">
+                        📊 Torque Burst Test (${burst.max_current_A}A for ${burst.duration_ms}ms)
+                        <span class="info-icon" data-tooltip="Validates motor KT constant by comparing:&#10;• Red line: Direct torque sensor measurement&#10;• Blue line: Estimated (Current × KT)&#10;• Green line: Actual current draw&#10;&#10;Close match = accurate KT calibration&#10;Large difference = calibration issue or inefficiency">i</span>
+                    </div>
+
+                    <div class="burst-test-summary">
+                        <div class="summary-card card-tooltip" data-tooltip="Average torque measured by sensor.&#10;Direct physical measurement.&#10;Ground truth for validation." style="cursor: help;">
+                            <div class="summary-card-value">${(avgMeasuredTorque * 1000).toFixed(1)}</div>
+                            <div class="summary-card-label">Avg Measured (mNm)</div>
+                        </div>
+                        <div class="summary-card card-tooltip" data-tooltip="Average estimated torque.&#10;Calculated as Current × KT.&#10;Should match measured if KT is accurate." style="cursor: help;">
+                            <div class="summary-card-value">${(avgEstimatedTorque * 1000).toFixed(1)}</div>
+                            <div class="summary-card-label">Avg Estimated (mNm)</div>
+                        </div>
+                        <div class="summary-card card-tooltip" data-tooltip="Average motor current during test.&#10;Set to ${burst.max_current_A}A target.&#10;May vary slightly due to control." style="cursor: help;">
+                            <div class="summary-card-value">${avgCurrent.toFixed(2)}</div>
+                            <div class="summary-card-label">Avg Current (A)</div>
+                        </div>
+                        <div class="summary-card card-tooltip" data-tooltip="Peak torque measured by sensor.&#10;Maximum torque achieved during burst.&#10;Important for peak load scenarios." style="cursor: help;">
+                            <div class="summary-card-value">${(maxMeasuredTorque * 1000).toFixed(1)}</div>
+                            <div class="summary-card-label">Max Measured (mNm)</div>
+                        </div>
+                        <div class="summary-card card-tooltip" data-tooltip="Number of data samples collected.&#10;Higher count = better resolution.&#10;Sampled over ${burst.duration_ms}ms duration." style="cursor: help;">
+                            <div class="summary-card-value">${burst.data.length}</div>
+                            <div class="summary-card-label">Data Points</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <canvas id="burstChart"></canvas>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generateInfoPanel() {
+            return ''; // Removed - info now in tooltips
+        }
+
+        function renderBurstTestChart(data) {
+            const ctx = document.getElementById('burstChart');
+            if (!ctx) return;
+
+            // Destroy existing chart
+            if (burstChart) {
+                burstChart.destroy();
+            }
+
+            // Prepare data
+            const labels = data.map(d => d.timestamp_ms.toFixed(1));
+            const measuredTorque = data.map(d => d.measured_torque_Nm * 1000); // Convert to mNm
+            const estimatedTorque = data.map(d => d.estimated_torque_Nm * 1000); // Convert to mNm
+            const current = data.map(d => d.current_A);
+
+            burstChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Measured Torque (mNm)',
+                            data: measuredTorque,
+                            borderColor: 'rgb(220, 38, 38)',
+                            backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                            borderWidth: 3,
+                            yAxisID: 'y',
+                            tension: 0.2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'Estimated Torque (mNm)',
+                            data: estimatedTorque,
+                            borderColor: 'rgb(37, 99, 235)',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            borderWidth: 3,
+                            yAxisID: 'y',
+                            tension: 0.2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'Current (A)',
+                            data: current,
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            borderWidth: 2,
+                            yAxisID: 'y1',
+                            tension: 0.2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    weight: '500'
+                                },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            callbacks: {
+                                title: function(context) {
+                                    return 'Time: ' + context[0].label + ' ms';
+                                },
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y.toFixed(3);
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time (ms)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Torque (mNm)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Current (A)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initial message
+        document.getElementById('content').innerHTML = `
+            <div class="section" style="text-align: center; padding: 60px 30px;">
+                <h2 style="color: #1e3c72; margin-bottom: 20px;">Welcome to Motor Test Results Viewer</h2>
+                <p style="font-size: 1.1rem; color: #666; margin-bottom: 30px;">
+                    Click the "Choose File" button above to load a motor test result JSON file from your computer.
+                </p>
+                <div style="background: #f0f4ff; padding: 20px; border-radius: 10px; display: inline-block;">
+                    <p style="color: #1e3c72; font-weight: 500;">📂 Expected location:</p>
+                    <code style="background: white; padding: 8px 16px; border-radius: 6px; display: inline-block; margin-top: 10px;">
+                        motorTest/results/*.json
+                    </code>
+                </div>
+            </div>
+        `;
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 {
   "name": "GMB2804",
   "description": "Small gimbal motor for testing",
+  "image_url": "",
   "motor_type": "gimbal",
   "pole_pairs": 7,
   "electrical": {
