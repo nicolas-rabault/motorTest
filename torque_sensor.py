@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 ATO-TQS-DYN-200 Digital Rotary Torque Sensor
-HEX Active upload mode (Communication mode 0) for 1KHz data rate.
+Subprocess-based continuous data acquisition with ring buffer.
 """
 
 import serial
 import struct
 import time
+import multiprocessing as mp
+import numpy as np
 from dataclasses import dataclass
 
 
@@ -17,180 +19,176 @@ class TorqueData:
     timestamp: float
 
 
+def _crc16(data: bytes) -> int:
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if crc & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+    return crc
+
+
+def _reader_process(port: str, baudrate: int, buffer_raw, write_index, data_rate):
+    """Subprocess: continuously read sensor and update ring buffer."""
+    buffer_array = np.frombuffer(buffer_raw.get_obj()).reshape(60000, 3)
+
+    try:
+        ser = serial.Serial(
+            port=port,
+            baudrate=baudrate,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.1
+        )
+    except Exception:
+        return
+
+    # Sync to frame boundary
+    buffer = bytearray()
+    consecutive_valid = 0
+    sync_timeout = 5.0
+    sync_start = time.time()
+
+    while consecutive_valid < 10:
+        if (time.time() - sync_start) > sync_timeout:
+            return
+
+        byte = ser.read(1)
+        if not byte:
+            continue
+        buffer.append(byte[0])
+        if len(buffer) < 6:
+            continue
+        crc_calc = _crc16(buffer[:4])
+        crc_recv = (buffer[5] << 8) | buffer[4]
+        if crc_calc == crc_recv:
+            consecutive_valid += 1
+            buffer = buffer[6:]
+        else:
+            consecutive_valid = 0
+            buffer = buffer[1:]
+
+    # Main acquisition loop
+    frame_count = 0
+    start_time = time.time()
+
+    while True:
+        frame = ser.read(6)
+        if len(frame) != 6:
+            continue
+
+        crc_calc = _crc16(frame[:4])
+        crc_recv = struct.unpack("<H", frame[4:6])[0]
+        if crc_calc != crc_recv:
+            continue
+
+        torque_mg = struct.unpack(">H", frame[0:2])[0]
+        speed_raw = struct.unpack(">H", frame[2:4])[0]
+
+        torque_nm = torque_mg / 1000.0
+        if speed_raw & 0x8000:
+            torque_nm = -torque_nm
+        speed_rpm = speed_raw & 0x7FFF
+
+        idx = write_index.value
+        buffer_array[idx, 0] = time.time()
+        buffer_array[idx, 1] = torque_nm
+        buffer_array[idx, 2] = speed_rpm
+        write_index.value = (idx + 1) % 60000
+
+        frame_count += 1
+        if frame_count % 100 == 0:
+            elapsed = time.time() - start_time
+            data_rate.value = frame_count / elapsed
+
+
 class TorqueSensor:
     """
-    ATO-TQS-DYN-200 in HEX Active upload mode.
-    Receives torque and speed at 1000Hz (115200 baud).
-
-    Buffer handling strategy:
-    - Sensor streams data continuously at 1kHz into OS serial buffer
-    - Buffer is FIFO: oldest data at front, newest at back
-    - read() MUST drain entire buffer to get to fresh data
-    - Always return most recent reading
+    ATO-TQS-DYN-200 with subprocess acquisition.
+    Ring buffer: 60s @ 1kHz (60,000 entries).
     """
 
     def __init__(self, port: str, baudrate: int = 115200):
         self.port = port
         self.baudrate = baudrate
-        self._serial = None
-        self._last_valid_data = None
+        self._process = None
+        self._buffer = None
+        self._write_index = None
+        self._data_rate = None
 
     def connect(self):
-        if self._serial and self._serial.is_open:
-            self._serial.close()
-            time.sleep(0.1)
+        self._buffer = mp.Array('d', 60000 * 3)
+        self._buffer_np = np.frombuffer(self._buffer.get_obj()).reshape(60000, 3)
+        self._buffer_np[:, 0] = -1.0
+        self._write_index = mp.Value('i', 0)
+        self._data_rate = mp.Value('d', 0.0)
 
-        self._serial = serial.Serial(
-            port=self.port,
-            baudrate=self.baudrate,
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0.01,  # 10ms timeout for reads
+        self._process = mp.Process(
+            target=_reader_process,
+            args=(self.port, self.baudrate, self._buffer, self._write_index, self._data_rate)
         )
-
-        self._serial.reset_input_buffer()
-        self._serial.reset_output_buffer()
-        self._sync_to_frame()
-
-    def _sync_to_frame(self):
-        """Find frame boundary by validating 10 consecutive frames."""
-        buffer = bytearray()
-        consecutive_valid = 0
-
-        while consecutive_valid < 10:
-            byte = self._serial.read(1)
-            if not byte:
-                continue
-
-            buffer.append(byte[0])
-
-            if len(buffer) < 6:
-                continue
-
-            # Check if first 6 bytes form a valid frame
-            crc_calc = self._crc16(buffer[:4])
-            crc_recv = (buffer[5] << 8) | buffer[4]
-
-            if crc_calc == crc_recv:
-                consecutive_valid += 1
-                buffer = buffer[6:]  # Remove valid frame
-            else:
-                consecutive_valid = 0
-                buffer = buffer[1:]  # Slide by 1 byte
-
-        time.sleep(0.02)  # Let buffer accumulate
+        self._process.start()
+        time.sleep(0.5)
 
     def disconnect(self):
-        if self._serial:
-            self._serial.close()
-            self._serial = None
+        if self._process:
+            self._process.terminate()
+            self._process.join(timeout=1.0)
+            self._process = None
 
-    def flush_old_data(self):
-        """
-        Aggressively flush buffer and wait for fresh data.
-        Returns guaranteed fresh reading (<10ms old).
-        """
-        # Strategy: Drain buffer multiple times, then wait for new frames
-        for _ in range(5):
-            available = self._serial.in_waiting
-            if available > 0:
-                self._serial.read(available)
-            time.sleep(0.002)  # 2ms between drains (sensor sends ~2 frames)
+    def read(self) -> TorqueData:
+        """Get most recent sample."""
+        idx = (self._write_index.value - 1) % 60000
+        return TorqueData(
+            timestamp=self._buffer_np[idx, 0],
+            torque=self._buffer_np[idx, 1],
+            speed=int(self._buffer_np[idx, 2])
+        )
 
-        # Now read fresh data that just arrived
-        time.sleep(0.005)  # Wait 5ms for fresh frames to accumulate
-        return self.read()
+    def read_recent(self, n: int) -> list[TorqueData]:
+        """Get last N samples (newest first)."""
+        idx = self._write_index.value
+        result = []
+        for i in range(min(n, idx, 60000)):
+            pos = (idx - 1 - i) % 60000
+            result.append(TorqueData(
+                timestamp=self._buffer_np[pos, 0],
+                torque=self._buffer_np[pos, 1],
+                speed=int(self._buffer_np[pos, 2])
+            ))
+        return result
 
-    @staticmethod
-    def _crc16(data: bytes) -> int:
-        crc = 0xFFFF
-        for byte in data:
-            crc ^= byte
-            for _ in range(8):
-                if crc & 0x0001:
-                    crc = (crc >> 1) ^ 0xA001
-                else:
-                    crc >>= 1
-        return crc
+    def read_range(self, duration_s: float) -> list[TorqueData]:
+        """Get all samples from last duration_s seconds (newest first)."""
+        cutoff = time.time() - duration_s
+        idx = self._write_index.value
+        result = []
+        for i in range(min(idx, 60000)):
+            pos = (idx - 1 - i) % 60000
+            ts = self._buffer_np[pos, 0]
+            if ts < cutoff:
+                break
+            result.append(TorqueData(
+                timestamp=ts,
+                torque=self._buffer_np[pos, 1],
+                speed=int(self._buffer_np[pos, 2])
+            ))
+        return result
 
-    def read(self, debug: bool = False) -> TorqueData | None:
-        """
-        Read and return FRESH torque data (never return stale cached data).
+    def get_data_rate(self) -> float:
+        """Get current acquisition rate (Hz)."""
+        return self._data_rate.value
 
-        Strategy:
-        1. If buffer empty, wait up to 5ms for data to arrive (sensor streams at 1kHz)
-        2. Drain ALL buffered frames
-        3. Return the last valid frame parsed
-        4. This guarantees data is <5ms old
-        """
-        # Check buffer and wait for fresh data if needed
-        available = self._serial.in_waiting
-
-        # If buffer empty, actively wait for new data (sensor streams at 1kHz)
-        if available < 6:
-            # Wait up to 20ms for fresh data (at 1kHz, should get ~20 frames)
-            max_wait_time = 0.02
-            wait_start = time.time()
-
-            while (time.time() - wait_start) < max_wait_time:
-                available = self._serial.in_waiting
-                if available >= 6:
-                    break  # Got data, exit wait loop
-                time.sleep(0.001)  # Check every 1ms
-
-        # Final check after waiting
-        available = self._serial.in_waiting
-        if available < 6:
-            # No data available even after waiting - return None
-            return None
-
-        # Calculate complete frames available
-        num_frames = available // 6
-
-        # Read all complete frames, keeping only the last valid one
-        new_data = None
-        frames_read = 0
-        frames_valid = 0
-
-        for _ in range(num_frames):
-            frame = self._serial.read(6)
-            if len(frame) != 6:
-                continue
-
-            frames_read += 1
-
-            # Validate CRC
-            crc_calc = self._crc16(frame[:4])
-            crc_recv = struct.unpack("<H", frame[4:6])[0]
-            if crc_calc != crc_recv:
-                continue  # Skip invalid frame
-
-            frames_valid += 1
-
-            # Parse valid frame - this becomes our candidate for "newest"
-            torque_mg = struct.unpack(">H", frame[0:2])[0]
-            speed_raw = struct.unpack(">H", frame[2:4])[0]
-
-            torque_nm = torque_mg / 1000.0
-            if speed_raw & 0x8000:
-                torque_nm = -torque_nm
-
-            speed_rpm = speed_raw & 0x7FFF
-
-            # Store this as the most recent data with CURRENT timestamp
-            new_data = TorqueData(torque=torque_nm, speed=speed_rpm, timestamp=time.time())
-
-        # Update cached value if we got new valid data
-        if new_data:
-            self._last_valid_data = new_data
-
-        if debug:
-            age = (time.time() - new_data.timestamp) if new_data else float('inf')
-            print(f"[DEBUG] Buffer: {available}B ({num_frames}F), Read: {frames_read}/{frames_valid} valid, Age: {age*1000:.1f}ms")
-
-        # Return fresh data (or None if no valid frames parsed)
-        return new_data
+    def get_zero_offset(self, duration_s: float = 1.0) -> float:
+        """Calculate zero offset by averaging recent data."""
+        samples = self.read_range(duration_s)
+        if not samples:
+            return 0.0
+        return sum(s.torque for s in samples) / len(samples)
 
     def __enter__(self):
         self.connect()
@@ -206,19 +204,11 @@ if __name__ == "__main__":
     parser.add_argument("--port", default="/dev/tty.usbserial-FTAK88EN")
     args = parser.parse_args()
 
-    count = 0
-    t_start = time.time()
-
-    def on_data(d):
-        global count, t_start
-        count += 1
-        if count % 100 == 0:
-            rate = count / (time.time() - t_start)
-            print(f"\rTorque: {d.torque:9.3f} Nm  Speed: {d.speed:6d} rpm  Rate: {rate:6.1f} Hz", end="", flush=True)
-
     with TorqueSensor(args.port) as sensor:
         print("Streaming. Ctrl+C to stop.\n")
         while True:
             data = sensor.read()
             if data:
-                on_data(data)
+                rate = sensor.get_data_rate()
+                print(f"\rTorque: {data.torque:9.3f} Nm  Speed: {data.speed:6d} rpm  Rate: {rate:6.1f} Hz", end="", flush=True)
+            time.sleep(0.1)

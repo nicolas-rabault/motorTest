@@ -165,6 +165,7 @@ def run_loaded_test(profile: MotorProfile, args) -> None:
 
     odrv = None
     brake = None
+    sensor = None
 
     try:
         # Load test results (should already exist from no-load test)
@@ -196,35 +197,17 @@ def run_loaded_test(profile: MotorProfile, args) -> None:
         print("Connecting to torque sensor...")
         sensor = TorqueSensor(args.sensor_port)
         sensor.connect()
+        time.sleep(1.5)
 
-        # Wait for sensor to stabilize after USB reset
-        print("Waiting for sensor to stabilize...")
-        time.sleep(0.5)
+        rate = sensor.get_data_rate()
+        if rate < 10:
+            raise RuntimeError(f"Torque sensor not receiving data on {args.sensor_port}")
 
-        # Verify sensor is receiving data
-        print("Verifying sensor data stream...")
-        test_count = 0
-        sample_values = []
-        for i in range(200):  # Increased from 100 to 200
-            data = sensor.read()
-            if data:
-                test_count += 1
-                sample_values.append(data.torque)
-                # Show first valid reading
-                if test_count == 1:
-                    print(f"  First reading: torque={data.torque:.4f} Nm, speed={data.speed} rpm")
-            time.sleep(0.001)
-
-        if test_count == 0:
-            raise RuntimeError(
-                f"Torque sensor not receiving data on {args.sensor_port}. "
-                "Check connection and ensure sensor is powered on."
-            )
-
-        # Show statistics
-        avg_torque = sum(sample_values) / len(sample_values) if sample_values else 0
-        print(f"  Sensor verification: {test_count}/200 valid reads - OK")
-        print(f"  Average torque: {avg_torque:.4f} Nm (should be near zero with no load)")
+        samples = sensor.read_recent(100)
+        if not samples:
+            raise RuntimeError("Torque sensor subprocess not writing data")
+        avg_torque = sum(s.torque for s in samples) / len(samples)
+        print(f"  Sensor: {rate:.1f} Hz, avg={avg_torque:.4f} Nm")
 
         # Connect to electromagnetic brake via power supply
         print("Connecting to brake...")
@@ -264,6 +247,8 @@ def run_loaded_test(profile: MotorProfile, args) -> None:
             odrv.disable()
         if brake:
             brake.release()
+        if sensor:
+            sensor.disconnect()
 
 
 def main():

@@ -25,6 +25,7 @@ class MotorProfile:
     """Motor configuration profile loaded from JSON."""
     name: str
     description: str = ""
+    image_url: str = ""  # Optional URL or path to motor image
     motor_type: str = "high_current"  # "high_current" or "gimbal"
     pole_pairs: int = 7
     kv_rating: float = 100.0
@@ -32,12 +33,12 @@ class MotorProfile:
     calibration_current: float = 5.0
     phase_resistance: Optional[float] = None  # Required for gimbal
     phase_inductance: Optional[float] = None  # Required for gimbal
-    
+
     @property
     def torque_constant(self) -> float:
         """Kt = 60 / (2 * pi * KV)"""
         return 60.0 / (2.0 * math.pi * self.kv_rating)
-    
+
     @classmethod
     def from_json(cls, filepath: str) -> "MotorProfile":
         with open(filepath, 'r') as f:
