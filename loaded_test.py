@@ -241,9 +241,9 @@ class LoadedTester:
         self,
         max_current: float,
         zero_offset: float = 0.0,
-        pre_burst_ms: float = 300.0,
-        burst_duration_ms: float = 100.0,
-        post_burst_ms: float = 300.0
+        pre_burst_ms: float = 100.0,
+        burst_duration_ms: float = 200.0,
+        post_burst_ms: float = 20000.0
     ) -> List[TorqueBurstDataPoint]:
         """Run max torque burst test with pre/post capture for time alignment."""
         self.brake.set_intensity(100.0)
@@ -271,8 +271,16 @@ class LoadedTester:
 
         time.sleep(pre_burst_ms / 1000.0)
 
+        print(f"  Setting current to {max_current}A...")
         self.odrv.set_current(max_current)
-        time.sleep(burst_duration_ms / 1000.0)
+
+        # Check what's actually being commanded
+        time.sleep(0.05)
+        state = self.odrv.read_state()
+        print(f"  Commanded torque: {self.odrv.axis.controller.input_torque:.4f} Nm")
+        print(f"  Iq setpoint: {state.iq_setpoint:.2f}A, Iq measured: {state.iq_measured:.2f}A")
+
+        time.sleep(burst_duration_ms / 1000.0 - 0.05)
         self.odrv.set_current(0)
 
         time.sleep(post_burst_ms / 1000.0)
@@ -342,10 +350,27 @@ class LoadedTester:
                 measured_speed_RPM=sample.speed
             ))
 
+        # Apply 30-sample moving average LPF to temperature using pandas
+        sorted_points = sorted(data_points, key=lambda d: d.time_relative_ms)
+
+        # Extract temperature values
+        import pandas as pd
+        temps = [p.motor_temperature_C if p.motor_temperature_C is not None else np.nan
+                 for p in sorted_points]
+
+        # Apply rolling mean with proper edge handling
+        temps_series = pd.Series(temps)
+        temps_filtered = temps_series.rolling(window=500, min_periods=1, center=True).mean()
+
+        # Update datapoints with filtered values
+        for i, point in enumerate(sorted_points):
+            if not np.isnan(temps_filtered.iloc[i]):
+                point.motor_temperature_C = float(temps_filtered.iloc[i])
+
         self.odrv.disable()
         self.brake.release()
 
-        return sorted(data_points, key=lambda d: d.time_relative_ms)
+        return sorted_points
     
     def run_full_test(self, max_current: float, skip_thermal: bool, thermal_duration: float) -> LoadedTestResult:
         """Run complete loaded motor test sequence (KT, thermal, burst)."""
@@ -384,8 +409,9 @@ class LoadedTester:
             print(f"  τ: {thermal_time_constant:.1f}s")
 
         # Test 3: Torque burst
-        print("\n--- Torque Burst (100ms) ---")
-        burst_data = self.run_torque_burst_test(max_current, zero_offset)
+        burst_duration_ms = 200.0  # Define burst duration
+        print(f"\n--- Torque Burst ({burst_duration_ms:.0f}ms) ---")
+        burst_data = self.run_torque_burst_test(max_current, zero_offset, burst_duration_ms=burst_duration_ms)
         if burst_data:
             avg_measured_torque = sum(d.measured_torque_Nm for d in burst_data) / len(burst_data)
             avg_current = sum(d.current_A for d in burst_data) / len(burst_data)
@@ -434,6 +460,25 @@ def main():
 
         # Load profile configuration
         odrv.load_profile(profile)
+
+        # Override current limits (temporary, not saved)
+        odrv.set_current_limit(profile.current_lim)
+
+        # Debug: Print all current-related config values
+        print("\n=== Current Configuration Debug ===")
+        print(f"dc_max_positive_current: {odrv.odrv.config.dc_max_positive_current}A")
+        print(f"motor.current_lim: {odrv.axis.motor.config.current_lim}A")
+        print(f"motor.requested_current_range: {odrv.axis.motor.config.requested_current_range}A")
+        print(f"motor.calibration_current: {odrv.axis.motor.config.calibration_current}A")
+
+        # Check if there are any thermal limits
+        try:
+            print(f"FET temp: {odrv.axis.fet_thermistor.temperature}°C")
+            print(f"Motor temp: {odrv.axis.motor_thermistor.temperature}°C")
+        except:
+            pass
+        print("===================================\n")
+
         print(f"Bus voltage: {odrv.read_bus_voltage():.1f}V")
 
         # Connect to torque sensor
@@ -458,7 +503,7 @@ def main():
         )
         results.add_torque_burst_test(
             max_current_a=result.max_test_current_A,
-            duration_ms=100,
+            duration_ms=200,
             data=result.torque_burst_data
         )
         results.add_test_metadata("loaded", result.bus_voltage_V)

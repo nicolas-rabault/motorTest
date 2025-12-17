@@ -411,6 +411,7 @@
     <script>
         let currentMotorData = null;
         let burstChart = null;
+        let tempChart = null;
 
         // Handle file selection
         document.getElementById('loadFileBtn').addEventListener('click', function() {
@@ -499,6 +500,7 @@
             // Render burst test chart if data exists
             if (data.torque_burst_test && data.torque_burst_test.data && data.torque_burst_test.data.length > 0) {
                 renderBurstTestChart(data.torque_burst_test.data);
+                renderTemperatureChart(data.torque_burst_test.data);
             }
         }
 
@@ -671,7 +673,6 @@
             const labels = data.map(d => d.time_relative_ms.toFixed(1));
             const measuredTorque = data.map(d => d.measured_torque_Nm * 1000); // Convert to mNm
             const estimatedTorque = data.map(d => d.estimated_torque_Nm * 1000); // Convert to mNm
-            const current = data.map(d => d.current_A);
 
             burstChart = new Chart(ctx, {
                 type: 'line',
@@ -684,10 +685,9 @@
                             borderColor: 'rgb(220, 38, 38)',
                             backgroundColor: 'rgba(220, 38, 38, 0.1)',
                             borderWidth: 3,
-                            yAxisID: 'y',
                             tension: 0.2,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
+                            pointRadius: 2,
+                            pointHoverRadius: 4
                         },
                         {
                             label: 'Estimated Torque (mNm)',
@@ -695,21 +695,9 @@
                             borderColor: 'rgb(37, 99, 235)',
                             backgroundColor: 'rgba(37, 99, 235, 0.1)',
                             borderWidth: 3,
-                            yAxisID: 'y',
                             tension: 0.2,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Current (A)',
-                            data: current,
-                            borderColor: 'rgb(34, 197, 94)',
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                            borderWidth: 2,
-                            yAxisID: 'y1',
-                            tension: 0.2,
-                            pointRadius: 3,
-                            pointHoverRadius: 5
+                            pointRadius: 2,
+                            pointHoverRadius: 4
                         }
                     ]
                 },
@@ -774,8 +762,7 @@
                             },
                             limits: {
                                 x: {min: 'original', max: 'original'},
-                                y: {min: 'original', max: 'original'},
-                                y1: {min: 'original', max: 'original'}
+                                y: {min: 'original', max: 'original'}
                             }
                         }
                     },
@@ -809,6 +796,138 @@
                             grid: {
                                 color: 'rgba(0, 0, 0, 0.05)'
                             }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTemperatureChart(data) {
+            const ctx = document.getElementById('tempChart');
+            if (!ctx) return;
+
+            // Destroy existing chart
+            if (tempChart) {
+                tempChart.destroy();
+            }
+
+            // Prepare data
+            const labels = data.map(d => d.time_relative_ms.toFixed(1));
+            const motorTemp = data.map(d => d.motor_temperature_C || null);
+            const current = data.map(d => d.current_A);
+
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Motor Temperature (°C)',
+                            data: motorTemp,
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 2,
+                            yAxisID: 'y',
+                            tension: 0.2,
+                            pointRadius: 1,
+                            pointHoverRadius: 3,
+                            spanGaps: true
+                        },
+                        {
+                            label: 'Current (A)',
+                            data: current,
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            borderWidth: 2,
+                            yAxisID: 'y1',
+                            tension: 0.2,
+                            pointRadius: 1,
+                            pointHoverRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 13,
+                                    weight: '500'
+                                },
+                                padding: 10,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            callbacks: {
+                                title: function(context) {
+                                    return 'Time: ' + context[0].label + ' ms';
+                                },
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + (context.parsed.y !== null ? context.parsed.y.toFixed(1) + '°C' : 'N/A');
+                                }
+                            }
+                        },
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                    speed: 0.1
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x',
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                            },
+                            limits: {
+                                x: {min: 'original', max: 'original'}
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time Relative to Burst Start (ms)',
+                                font: {
+                                    size: 13,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)',
+                                font: {
+                                    size: 13,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
                         },
                         y1: {
                             type: 'linear',
@@ -818,12 +937,12 @@
                                 display: true,
                                 text: 'Current (A)',
                                 font: {
-                                    size: 14,
+                                    size: 13,
                                     weight: 'bold'
                                 }
                             },
                             grid: {
-                                drawOnChartArea: false,
+                                drawOnChartArea: false
                             }
                         }
                     }

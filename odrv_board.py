@@ -107,13 +107,13 @@ class ODriveBoard:
     def load_profile(self, profile: MotorProfile) -> None:
         self._profile = profile
         self._log(f"Loading profile: {profile.name}")
-        
+
         # Power config
         self._odrv.config.brake_resistance = 2.0
         self._odrv.config.dc_bus_undervoltage_trip_level = 8.0
         self._odrv.config.dc_bus_overvoltage_trip_level = 56.0
         self._odrv.config.dc_max_negative_current = -5.0
-        self._odrv.config.dc_max_positive_current = profile.current_lim
+        self._odrv.config.dc_max_positive_current = profile.current_lim + 5.0  # Add headroom
         self._odrv.config.max_regen_current = 0
         
         # Motor config
@@ -306,10 +306,56 @@ class ODriveBoard:
         if self._axis.current_state != AXIS_STATE_IDLE:
             self._axis.requested_state = AXIS_STATE_IDLE
             time.sleep(0.1)  # Wait for state transition
-        
+
         self._axis.controller.config.control_mode = modes[mode.lower()]
         self._axis.controller.config.input_mode = INPUT_MODE_PASSTHROUGH
         self._log(f"Control mode set to: {mode}")
+
+    def set_current_limit(self, current_lim: float) -> None:
+        """Override current limits without saving (temporary until reboot)."""
+        # Disable motor first
+        was_enabled = (self._axis.current_state == AXIS_STATE_CLOSED_LOOP_CONTROL)
+        if was_enabled:
+            self.disable()
+
+        # Set all current limits with extra headroom
+        self._odrv.config.dc_max_positive_current = current_lim + 10.0
+        self._axis.motor.config.current_lim = current_lim
+        self._axis.motor.config.requested_current_range = current_lim * 1.5
+
+        # Try to set current_lim_margin if it exists (ODrive 0.5.x may not have it)
+        try:
+            self._axis.motor.config.current_lim_margin = current_lim
+        except AttributeError:
+            pass
+
+        # Set current control bandwidth high enough for fast response
+        try:
+            self._axis.motor.config.current_control_bandwidth = 1000
+        except AttributeError:
+            pass
+
+        # Re-enable if it was enabled
+        if was_enabled:
+            self.enable()
+
+        # Read back to verify
+        dc_limit = self._odrv.config.dc_max_positive_current
+        motor_limit = self._axis.motor.config.current_lim
+        current_range = self._axis.motor.config.requested_current_range
+
+        self._log(f"Current limits set:")
+        self._log(f"  dc_max_positive_current: {dc_limit}A")
+        self._log(f"  motor.current_lim: {motor_limit}A")
+        self._log(f"  requested_current_range: {current_range}A")
+
+        # Debug: Check what limits are actually active
+        self._log(f"Checking for other current limits...")
+        try:
+            self._log(f"  inverter_temp_limit_lower: {self._axis.motor.config.inverter_temp_limit_lower}°C")
+            self._log(f"  inverter_temp_limit_upper: {self._axis.motor.config.inverter_temp_limit_upper}°C")
+        except:
+            pass
     
     def set_torque(self, torque_nm: float) -> None:
         self._axis.controller.input_torque = torque_nm
