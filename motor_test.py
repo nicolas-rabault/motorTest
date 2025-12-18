@@ -230,7 +230,7 @@ def run_loaded_test(profile: MotorProfile, args) -> None:
         )
         results.add_torque_burst_test(
             max_current_a=result.max_test_current_A,
-            duration_ms=100,
+            duration_ms=result.burst_duration_ms,
             data=result.torque_burst_data
         )
         results.add_test_metadata("loaded", result.bus_voltage_V)

@@ -4,7 +4,7 @@
   "motor_type": "high_current",
   "pole_pairs": 7,
   "kv_rating": 1500,
-  "current_lim": 8.0,
+  "current_lim": 40.0,
   "calibration_current": 2.0,
   "image_url": "https://www.drone-fpv-racer.com/70324-large_default/moteur-velox-v2207-v3-1500kv-t-motor.jpg"
 }

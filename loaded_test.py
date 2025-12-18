@@ -61,6 +61,7 @@ class LoadedTestResult:
     # Test conditions
     bus_voltage_V: float
     max_test_current_A: float
+    burst_duration_ms: float
 
     # Torque burst test results
     torque_burst_data: List[Dict[str, Any]] = field(default_factory=list)
@@ -428,6 +429,7 @@ class LoadedTester:
             thermal_time_constant_s=thermal_time_constant,
             bus_voltage_V=state.bus_voltage,
             max_test_current_A=max_current,
+            burst_duration_ms=burst_duration_ms,
             torque_burst_data=[asdict(d) for d in burst_data]
         )
 
@@ -503,7 +505,7 @@ def main():
         )
         results.add_torque_burst_test(
             max_current_a=result.max_test_current_A,
-            duration_ms=200,
+            duration_ms=result.burst_duration_ms,
             data=result.torque_burst_data
         )
         results.add_test_metadata("loaded", result.bus_voltage_V)
