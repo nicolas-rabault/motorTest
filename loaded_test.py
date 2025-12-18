@@ -181,9 +181,16 @@ class LoadedTester:
     
     def measure_thermal_parameters(self, test_current: float, heating_duration: float) -> ThermalTestData:
         """Measure thermal resistance and time constant."""
-        # Record ambient temperature before heating
+        # Use fixed ambient temperature of 20°C
+        ambient_temp = 20.0
+
+        # Verify motor thermistor is available
         state = self.odrv.read_state()
-        ambient_temp = state.motor_temperature or state.fet_temperature or 25.0
+        if state.motor_temperature is None:
+            raise RuntimeError("Motor thermistor not available - cannot measure thermal parameters")
+
+        print(f"  Ambient temperature: {ambient_temp}°C (fixed)")
+        print(f"  Current motor temperature: {state.motor_temperature:.1f}°C")
 
         # Enable brake at 30% intensity and configure torque control mode
         self.brake.set_intensity(30.0)
@@ -195,7 +202,8 @@ class LoadedTester:
         time.sleep(0.1)
         self.odrv.enable()
 
-        # Apply constant current and record temperature rise over time
+        # HEATING PHASE: Apply constant current and record temperature rise over time
+        print(f"  Heating phase: {heating_duration:.0f}s at {test_current:.1f}A...")
         heating_data = []
         self.odrv.set_current(test_current)
         phase_resistance = self.profile.phase_resistance or self.odrv.axis.motor.config.phase_resistance
@@ -203,7 +211,10 @@ class LoadedTester:
 
         while (time.time() - start_time) < heating_duration:
             state = self.odrv.read_state()
-            temp = state.motor_temperature or state.fet_temperature
+            temp = state.motor_temperature
+            if temp is None:
+                raise RuntimeError("Motor thermistor reading lost during test")
+
             current = state.iq_measured
             power = (current ** 2) * phase_resistance * 1.5
 
@@ -212,26 +223,77 @@ class LoadedTester:
                 'temperature': temp,
                 'power': power
             })
-            time.sleep(1.0)
+            time.sleep(0.1)  # 10 Hz sampling rate
 
-        # Stop motor, disable, and release brake
+        # Stop motor
         self.odrv.set_current(0)
         self.odrv.disable()
-        self.brake.release()
 
-        # Calculate thermal resistance: R_th = ΔT / P
-        final_temp = heating_data[-1]['temperature'] if heating_data else ambient_temp
+        # Calculate thermal resistance from heating phase: R_th = ΔT / P
+        final_temp = heating_data[-1]['temperature']
         temp_rise = final_temp - ambient_temp
         avg_power = sum(d['power'] for d in heating_data) / len(heating_data) if heating_data else 1.0
         thermal_resistance = temp_rise / avg_power if avg_power > 0.1 else 0.0
 
-        # Calculate thermal time constant: time to reach 63.2% of final temperature rise
+        print(f"  Heating complete: {final_temp:.1f}°C (ΔT={temp_rise:.1f}°C)")
+        print(f"  Average power: {avg_power:.2f}W")
+
+        # Calculate heating time constant: time to reach 63.2% of final temperature rise
         target_temp = ambient_temp + 0.632 * temp_rise
-        time_constant = heating_duration
+        heating_time_constant = heating_duration
         for data in heating_data:
             if data['temperature'] >= target_temp:
-                time_constant = data['time']
+                heating_time_constant = data['time']
                 break
+
+        # COOLING PHASE: Record temperature decay back to ambient
+        print(f"  Cooling phase: monitoring temperature decay...")
+        cooling_data = []
+        start_temp = final_temp
+        start_time = time.time()
+
+        # Continue until temperature drops significantly or timeout (3x heating time constant)
+        max_cooling_time = max(300, 3 * heating_time_constant)  # At least 5 minutes
+
+        while (time.time() - start_time) < max_cooling_time:
+            state = self.odrv.read_state()
+            temp = state.motor_temperature
+            if temp is None:
+                print("  ⚠️  Motor thermistor reading lost during cooling")
+                break
+
+            cooling_data.append({
+                'time': time.time() - start_time,
+                'temperature': temp
+            })
+
+            # Stop if we've cooled to within 10% of ambient
+            if abs(temp - ambient_temp) < 0.1 * temp_rise:
+                print(f"  Cooled to near-ambient: {temp:.1f}°C")
+                break
+
+            time.sleep(0.1)  # 10 Hz sampling rate
+
+        # Release brake after cooling measurement
+        self.brake.release()
+
+        # Calculate cooling time constant: time to decay to 36.8% of initial temperature rise
+        # T(t) = T_ambient + ΔT_initial × e^(-t/τ)
+        # At t=τ, remaining rise = 0.368 × initial rise
+        initial_temp_rise = start_temp - ambient_temp
+        target_temp_cooling = ambient_temp + 0.368 * initial_temp_rise
+        cooling_time_constant = max_cooling_time
+        for data in cooling_data:
+            if data['temperature'] <= target_temp_cooling:
+                cooling_time_constant = data['time']
+                break
+
+        # Average the heating and cooling time constants
+        time_constant = (heating_time_constant + cooling_time_constant) / 2.0
+
+        print(f"  Heating τ: {heating_time_constant:.1f}s")
+        print(f"  Cooling τ: {cooling_time_constant:.1f}s")
+        print(f"  Average τ: {time_constant:.1f}s")
 
         return ThermalTestData(
             thermal_resistance_C_per_W=thermal_resistance,

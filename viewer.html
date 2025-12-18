@@ -493,6 +493,7 @@
                 </div>
 
                 ${generateElectricalSection(data)}
+                ${generateThermalSection(data)}
                 ${generateBurstTestSection(data)}
                 ${generateInfoPanel()}
             `;
@@ -583,6 +584,57 @@
         function generateMechanicalSection(data) {
             // Now combined with electrical section
             return '';
+        }
+
+        function generateThermalSection(data) {
+            const thermal = data.thermal || {};
+
+            // Check if we have any thermal data
+            if (!thermal.thermal_resistance_C_per_W && !thermal.thermal_time_constant_s) {
+                return `
+                    <div class="section">
+                        <div class="section-title">
+                            🌡️ Thermal Characteristics
+                            <span class="info-icon" data-tooltip="Motor thermal properties">i</span>
+                        </div>
+                        <div class="no-data">No thermal test data available for this motor</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="section">
+                    <div class="section-title">
+                        🌡️ Thermal Characteristics
+                        <span class="info-icon" data-tooltip="Motor thermal properties measured during heating and cooling">i</span>
+                    </div>
+                    <div class="cards-grid">
+                        <div class="card card-tooltip" data-tooltip="Thermal resistance (R_th).&#10;Temperature rise per watt of power dissipated.&#10;Lower is better - motor stays cooler.&#10;&#10;Measured during heating phase with constant current.">
+                            <div class="card-label">Thermal Resistance</div>
+                            <div class="card-value">${thermal.thermal_resistance_C_per_W ? thermal.thermal_resistance_C_per_W.toFixed(2) : 'N/A'}</div>
+                            <div class="card-unit">°C/W</div>
+                        </div>
+                        <div class="card card-tooltip" data-tooltip="Thermal time constant (τ).&#10;Time for temperature to reach 63.2% of final value.&#10;Averaged from heating and cooling phases.&#10;&#10;Larger motors typically have longer time constants.">
+                            <div class="card-label">Time Constant (τ)</div>
+                            <div class="card-value">${thermal.thermal_time_constant_s ? thermal.thermal_time_constant_s.toFixed(1) : 'N/A'}</div>
+                            <div class="card-unit">seconds</div>
+                        </div>
+                    </div>
+                    ${thermal.thermal_resistance_C_per_W && thermal.thermal_resistance_C_per_W > 0 ? `
+                    <div style="margin-top: 15px; padding: 15px; background: #e3f2fd; border-radius: 8px; border-left: 4px solid #2196f3;">
+                        <div style="font-size: 0.95rem; color: #1565c0; font-weight: 500; margin-bottom: 8px;">
+                            💡 Thermal Interpretation
+                        </div>
+                        <div style="font-size: 0.9rem; color: #555; line-height: 1.6;">
+                            At continuous operation, this motor will heat up by <strong>${thermal.thermal_resistance_C_per_W.toFixed(1)}°C per watt</strong> of power dissipated.
+                            <br>
+                            The motor reaches ~63% of its final temperature after <strong>${thermal.thermal_time_constant_s ? thermal.thermal_time_constant_s.toFixed(0) : 'N/A'} seconds</strong>,
+                            and ~95% after <strong>${thermal.thermal_time_constant_s ? (3 * thermal.thermal_time_constant_s).toFixed(0) : 'N/A'} seconds</strong>.
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
         }
 
         function generateBurstTestSection(data) {
