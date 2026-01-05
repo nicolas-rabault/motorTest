@@ -159,9 +159,12 @@ class NoLoadTester:
         mean_current = sum(currents) / len(currents)
         variance = sum((c - mean_current) ** 2 for c in currents) / len(currents)
         std_current = math.sqrt(variance)
-        
-        self._log(f"No-load current: {mean_current:.4f} ± {std_current:.4f} A")
-        return mean_current, std_current
+
+        # Store as absolute value since direction doesn't matter for no-load current
+        mean_current_abs = abs(mean_current)
+
+        self._log(f"No-load current: {mean_current_abs:.4f} ± {std_current:.4f} A")
+        return mean_current_abs, std_current
     
     def measure_inertia(
         self,
