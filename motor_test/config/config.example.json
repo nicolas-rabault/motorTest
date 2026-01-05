@@ -1,0 +1,11 @@
+{
+  "_comment": "Motor Test Suite Configuration Example",
+  "_description": "Copy this file to ~/.motor-test-config or motor_test.config and customize for your test bench",
+  "sensor_port": "/dev/tty.usbserial-FTAK88EN",
+  "brake_port": "/dev/tty.usbmodem0000057700001",
+  "odrive_port": null,
+  "velocity": 10.0,
+  "current": 2.0,
+  "thermal_duration": 60.0,
+  "debug": false
+}

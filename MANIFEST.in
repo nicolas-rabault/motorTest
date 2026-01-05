@@ -1,0 +1,4 @@
+include README.md
+include requirements.txt
+include motor_test/config/*.json
+recursive-include motor_test *.py

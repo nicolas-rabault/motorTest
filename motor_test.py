@@ -118,6 +118,7 @@ def run_no_load_test(profile: MotorProfile, args) -> None:
     # Update results with measurements
     results.update_motor_info(
         description=profile.description,
+        image_url=profile.image_url,
         motor_type=profile.motor_type,
         pole_pairs=profile.pole_pairs,
         kv_rating=profile.kv_rating

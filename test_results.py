@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 
-RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR = Path.cwd() / "results"
 
 
 class MotorTestResults:
@@ -38,6 +38,7 @@ class MotorTestResults:
             return {
                 "name": self.motor_name,
                 "description": "",
+                "image_url": "",
                 "motor_type": "",
                 "pole_pairs": 0,
                 "kv_rating": 0,
@@ -52,10 +53,12 @@ class MotorTestResults:
             }
 
     def update_motor_info(self, description: str = None, motor_type: str = None,
-                         pole_pairs: int = None, kv_rating: float = None):
+                         pole_pairs: int = None, kv_rating: float = None, image_url: str = None):
         """Update basic motor information."""
         if description:
             self.data["description"] = description
+        if image_url:
+            self.data["image_url"] = image_url
         if motor_type:
             self.data["motor_type"] = motor_type
         if pole_pairs:

@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+reachy_mini_env/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Configuration files (personal)
+config.yaml
+motor_test.config
+*.local.json
+.motor-test-config
+
+# Personal motor profiles
+*_profile.json
+!motor_profile.json
+
+# Temporary files
+*.log
+.DS_Store
+.claude/
+
+# Documentation
+*.pdf
+viewer.html
+claude.md

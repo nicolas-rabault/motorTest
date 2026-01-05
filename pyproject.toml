@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "motor-test"
+version = "1.0.0"
+description = "Complete motor characterization test suite for Pollen Robotics test bench"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "Pollen Robotics", email = "contact@pollen-robotics.com"}
+]
+keywords = ["motor", "testing", "characterization", "odrive", "robotics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "pyserial>=3.5",
+    "odrive==0.5.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "flake8>=6.0",
+]
+
+[project.scripts]
+motor-test = "motor_test.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/pollen-robotics/motor-test"
+Repository = "https://github.com/pollen-robotics/motor-test"
+
+[tool.setuptools]
+packages = ["motor_test"]
+
+[tool.setuptools.package-data]
+motor_test = ["config/*.example"]
