@@ -33,11 +33,13 @@ motor-test --help
 ## Quick Start
 
 1. **Create a configuration file:**
+
 ```bash
 motor-test config --create
 ```
 
 2. **Create a motor profile** (`my_motor.json`):
+
 ```json
 {
   "name": "GMB2804",
@@ -51,7 +53,10 @@ motor-test config --create
 }
 ```
 
+Profiles are stored in the `profile/` directory.
+
 3. **Run the tests:**
+
 ```bash
 motor-test --profile my_motor.json
 ```
@@ -69,6 +74,7 @@ Open [viewer.html](viewer.html) in your browser and load a result file from the 
 This repository can be published as a GitHub Pages site to view results online:
 
 1. **Enable GitHub Pages** in repository settings:
+
    - Go to Settings → Pages
    - Source: "Deploy from a branch"
    - Branch: `master` (or `main`)
@@ -76,11 +82,13 @@ This repository can be published as a GitHub Pages site to view results online:
    - Save
 
 2. **The results index is automatically updated** after each test completes. To manually regenerate:
+
    ```bash
    python3 generate_index.py
    ```
 
 3. **Commit and push your results**:
+
    ```bash
    git add results/ docs/results-index.json
    git commit -m "Add new motor test results"
@@ -98,6 +106,7 @@ The index generator script scans the `results/` directory and creates a list of 
 The suite performs two test sequences:
 
 1. **No-load test** - Motor free to spin
+
    - Measures: impedance, KV, no-load current, inertia
 
 2. **Loaded test** - With brake and torque sensor
@@ -125,18 +134,10 @@ motor-test --profile motor.json --velocity 15 --current 3
 motor-test config --show
 ```
 
-## Documentation
-
-For detailed information, see the [full documentation](https://github.com/nicolas-rabault/motorTest):
-- Configuration options
-- Motor profile formats
-- Hardware setup requirements
-- Troubleshooting guide
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Issues and pull requests are welcome on the [GitHub repository](https://github.com/nicolas-rabault/motorTest).
+Issues and pull requests are welcome.
