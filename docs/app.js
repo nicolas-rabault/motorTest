@@ -46,8 +46,12 @@ async function loadResults() {
         // Handle view button click
         viewButton.addEventListener('click', () => {
             if (select.value) {
+                // Get the base path (remove /docs/ or /docs/index.html from current path)
+                const currentPath = window.location.pathname;
+                const basePath = currentPath.replace(/\/docs\/?.*$/, '');
+
                 // Redirect to viewer with the selected file
-                window.location.href = `../viewer.html?file=${encodeURIComponent(select.value)}`;
+                window.location.href = `${basePath}/viewer.html?file=${encodeURIComponent(select.value)}`;
             }
         });
 
