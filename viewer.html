@@ -670,6 +670,15 @@
                 currents.reduce((a, b) => a + b, 0) / currents.length : 0;
             const maxMeasuredTorque = measuredTorques.length > 0 ? Math.max(...measuredTorques) : 0;
 
+            // Calculate delta temperature (max - min)
+            const temperatures = burst.data.map(d => d.motor_temperature_C).filter(t => t !== null && !isNaN(t));
+            const deltaTemp = temperatures.length > 0 ?
+                Math.max(...temperatures) - Math.min(...temperatures) : 0;
+
+            // Calculate error between measured and estimated torque
+            const torqueError = avgMeasuredTorque !== 0 ?
+                Math.abs((avgMeasuredTorque - avgEstimatedTorque) / avgMeasuredTorque * 100) : 0;
+
             return `
                 <div class="section">
                     <div class="section-title">
@@ -694,9 +703,13 @@
                             <div class="summary-card-value">${(maxMeasuredTorque * 1000).toFixed(1)}</div>
                             <div class="summary-card-label">Max Measured (mNm)</div>
                         </div>
-                        <div class="summary-card card-tooltip" data-tooltip="Number of data samples collected.&#10;Higher count = better resolution.&#10;Sampled over ${burst.duration_ms}ms duration." style="cursor: help;">
-                            <div class="summary-card-value">${burst.data.length}</div>
-                            <div class="summary-card-label">Data Points</div>
+                        <div class="summary-card card-tooltip" data-tooltip="Temperature rise during burst test.&#10;Calculated as max temp - min temp.&#10;Indicates thermal stress during test." style="cursor: help;">
+                            <div class="summary-card-value">${deltaTemp.toFixed(1)}</div>
+                            <div class="summary-card-label">ΔTemp (°C)</div>
+                        </div>
+                        <div class="summary-card card-tooltip" data-tooltip="Error between measured and estimated torque.&#10;Calculated as |Measured - Estimated| / Measured × 100%.&#10;Lower error = better KT calibration.&#10;<10% is excellent, <20% is good." style="cursor: help;">
+                            <div class="summary-card-value">${torqueError.toFixed(1)}</div>
+                            <div class="summary-card-label">Torque Error (%)</div>
                         </div>
                     </div>
 
