@@ -46,23 +46,8 @@ async function loadResults() {
         // Handle view button click
         viewButton.addEventListener('click', () => {
             if (select.value) {
-                // Get the base path by going up one level from docs/
-                const currentPath = window.location.pathname;
-                let basePath;
-
-                if (currentPath.includes('/docs/')) {
-                    // Extract everything before /docs/
-                    basePath = currentPath.substring(0, currentPath.indexOf('/docs/'));
-                } else if (currentPath.endsWith('/docs')) {
-                    // Remove /docs from the end
-                    basePath = currentPath.substring(0, currentPath.lastIndexOf('/docs'));
-                } else {
-                    // Fallback: use parent directory
-                    basePath = '..';
-                }
-
-                // Redirect to viewer with the selected file
-                window.location.href = `${basePath}/viewer.html?file=${encodeURIComponent(select.value)}`;
+                // Use relative path - always works from docs/ to parent directory
+                window.location.href = `../viewer.html?file=${encodeURIComponent(select.value)}`;
             }
         });
 

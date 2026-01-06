@@ -67,7 +67,7 @@ Results are saved to `results/{motor_name}_results.json`.
 
 ### Local Viewing
 
-Open [viewer.html](viewer.html) in your browser and load a result file from the `results/` directory.
+Open [viewer.html](https://nicolas-rabault.github.io/motorTest/viewer.html) in your browser and load a result file from the `results/` directory.
 
 ### GitHub Pages (Online Viewer)
 
