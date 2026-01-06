@@ -36,6 +36,41 @@ motor-test --profile my_motor.json
 
 Results are saved to `results/{motor_name}_results.json`.
 
+## Viewing Results
+
+### Local Viewing
+
+Open [viewer.html](viewer.html) in your browser and load a result file from the `results/` directory.
+
+### GitHub Pages (Online Viewer)
+
+This repository can be published as a GitHub Pages site to view results online:
+
+1. **Enable GitHub Pages** in repository settings:
+   - Go to Settings → Pages
+   - Source: "Deploy from a branch"
+   - Branch: `master` (or `main`)
+   - Folder: `/docs`
+   - Save
+
+2. **The results index is automatically updated** after each test completes. To manually regenerate:
+   ```bash
+   python3 generate_index.py
+   ```
+
+3. **Commit and push your results**:
+   ```bash
+   git add results/ docs/results-index.json
+   git commit -m "Add new motor test results"
+   git push
+   ```
+
+4. **Access your results online**:
+   - Landing page: `https://<username>.github.io/motorTest/`
+   - Direct link: `https://<username>.github.io/motorTest/viewer.html?file=<result_file>.json`
+
+The index generator script scans the `results/` directory and creates a list of available results for the online viewer.
+
 ## Tests
 
 The suite performs two test sequences:

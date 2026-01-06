@@ -413,6 +413,42 @@
         let burstChart = null;
         let tempChart = null;
 
+        // Check for URL parameter on page load
+        function checkUrlParameter() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const filename = urlParams.get('file');
+
+            if (filename) {
+                // Load file from results directory
+                loadResultFile(filename);
+            }
+        }
+
+        // Load a result file from the results directory
+        async function loadResultFile(filename) {
+            try {
+                document.getElementById('content').innerHTML = '<div class="loading">Loading ' + filename + '...</div>';
+
+                const response = await fetch('results/' + filename);
+
+                if (!response.ok) {
+                    throw new Error('Failed to load file: ' + filename);
+                }
+
+                const data = await response.json();
+                currentMotorData = data;
+                displayMotorData(data);
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading result file:</strong> ${error.message}
+                        <br><br>
+                        <a href="docs/index.html" style="color: #1976d2; text-decoration: underline;">← Back to result selector</a>
+                    </div>
+                `;
+            }
+        }
+
         // Handle file selection
         document.getElementById('loadFileBtn').addEventListener('click', function() {
             document.getElementById('fileInput').click();
@@ -438,6 +474,9 @@
             };
             reader.readAsText(file);
         });
+
+        // Check for URL parameter when page loads
+        checkUrlParameter();
 
         // Display motor data
         function displayMotorData(data) {

@@ -452,6 +452,25 @@ def main():
         print(f"\n{results}")
         print(f"\nFinal results saved to: {results.results_path}")
 
+        # Update GitHub Pages results index
+        print("\nUpdating results index for GitHub Pages...")
+        try:
+            import subprocess
+            # Get repository root (3 levels up from motor_test/cli.py)
+            repo_root = Path(__file__).parent.parent
+            result = subprocess.run(
+                ["python3", "generate_index.py"],
+                capture_output=True,
+                text=True,
+                cwd=repo_root
+            )
+            if result.returncode == 0:
+                print("✓ Results index updated")
+            else:
+                print(f"⚠ Failed to update results index: {result.stderr}")
+        except Exception as e:
+            print(f"⚠ Could not update results index: {e}")
+
     except KeyboardInterrupt:
         print("\n\nTest interrupted by user")
         return 1
