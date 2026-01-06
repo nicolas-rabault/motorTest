@@ -456,13 +456,14 @@ def main():
         print("\nUpdating results index for GitHub Pages...")
         try:
             import subprocess
-            # Get repository root (3 levels up from motor_test/cli.py)
+            # Get repository root and docs folder
             repo_root = Path(__file__).parent.parent
+            docs_dir = repo_root / 'docs'
             result = subprocess.run(
                 ["python3", "generate_index.py"],
                 capture_output=True,
                 text=True,
-                cwd=repo_root
+                cwd=docs_dir
             )
             if result.returncode == 0:
                 print("✓ Results index updated")

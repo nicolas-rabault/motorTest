@@ -13,9 +13,9 @@ from pathlib import Path
 
 def generate_results_index():
     """Scan results directory and generate index file."""
-    # Define paths
-    results_dir = Path(__file__).parent / 'results'
-    output_file = Path(__file__).parent / 'docs' / 'results-index.json'
+    # Define paths (script is in docs/, results is in parent directory)
+    results_dir = Path(__file__).parent.parent / 'results'
+    output_file = Path(__file__).parent / 'results-index.json'
 
     # Check if results directory exists
     if not results_dir.exists():
