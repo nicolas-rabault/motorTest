@@ -46,8 +46,8 @@ async function loadResults() {
         // Handle view button click
         viewButton.addEventListener('click', () => {
             if (select.value) {
-                // Use relative path - always works from docs/ to parent directory
-                window.location.href = `../viewer.html?file=${encodeURIComponent(select.value)}`;
+                // In GitHub Actions deployment, everything is in the same directory
+                window.location.href = `viewer.html?file=${encodeURIComponent(select.value)}`;
             }
         });
 

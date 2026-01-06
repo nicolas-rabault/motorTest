@@ -2,8 +2,8 @@
 """
 Generate results index for GitHub Pages viewer.
 
-This script scans the /results directory for JSON files and creates
-an index file (docs/results-index.json) that lists all available results.
+This script scans the results/ directory for JSON files and creates
+an index file (results-index.json) that lists all available results.
 """
 
 import json
