@@ -1,0 +1,10 @@
+{
+  "name": "V2808_1300KV",
+  "description": "Velox V2808 1300KV from T-motor",
+  "motor_type": "high_current",
+  "pole_pairs": 7,
+  "kv_rating": 1300,
+  "current_lim": 40.0,
+  "calibration_current": 3.0,
+  "image_url": "https://www.tmotorhobby.com/images/202207/goods_img/1199_P_1658999801233.jpg"
+}

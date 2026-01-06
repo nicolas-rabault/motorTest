@@ -1,0 +1,10 @@
+{
+  "name": "Emax_2306_1700KV",
+  "description": "Emax ECO II Series 2306 1700KV",
+  "motor_type": "high_current",
+  "pole_pairs": 7,
+  "kv_rating": 1700,
+  "current_lim": 40.0,
+  "calibration_current": 2.0,
+  "image_url": "https://emaxmodel.com/cdn/shop/products/50BD0DE0904B080C0458E821A103BFA2_b4ded879-701d-4a79-96d2-4e0463ddf2f2.jpg?v=1602905144"
+}

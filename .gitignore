@@ -40,10 +40,6 @@ motor_test.config
 *.local.json
 .motor-test-config
 
-# Personal motor profiles
-*_profile.json
-!motor_profile.json
-
 # Temporary files
 *.log
 .DS_Store
@@ -51,5 +47,4 @@ motor_test.config
 
 # Documentation
 *.pdf
-viewer.html
 claude.md
