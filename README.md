@@ -6,7 +6,29 @@ This package provides automated testing measuring electrical characteristics, me
 
 ## Installation
 
-See the [installation guide](https://github.com/nicolas-rabault/motorTest) for detailed setup instructions.
+### Prerequisites
+
+- Python 3.8 or higher
+- ODrive controller
+- Torque sensor (for loaded tests)
+- Electromagnetic brake (for loaded tests)
+
+### Install from source
+
+```bash
+# Clone the repository
+git clone https://github.com/nicolas-rabault/motorTest.git
+cd motorTest
+
+# Install the package
+pip install -e .
+```
+
+### Verify installation
+
+```bash
+motor-test --help
+```
 
 ## Quick Start
 
