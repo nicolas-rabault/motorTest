@@ -2,6 +2,8 @@
 
 Complete motor characterization test suite for BLDC motors using ODrive controllers.
 
+**📊 [View Test Results Online](https://nicolas-rabault.github.io/motorTest/)**
+
 This package provides automated testing measuring electrical characteristics, mechanical properties, and thermal behavior.
 
 ## Installation
