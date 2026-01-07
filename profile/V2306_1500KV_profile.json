@@ -1,0 +1,11 @@
+{
+  "name": "V2306_1500KV",
+  "description": "Velox V2306 V3 1500KV from T-motor painted in white",
+  "motor_type": "high_current",
+  "pole_pairs": 7,
+  "kv_rating": 1500,
+  "current_lim": 40.0,
+  "calibration_current": 3.0,
+  "weight_g": 32.7,
+  "image_url": "https://www.lacameraembarquee.fr/77164-large_default/moteur-t-motor-v2306-v3-1500kv-1750kv-ou-1950kv.jpg"
+}
