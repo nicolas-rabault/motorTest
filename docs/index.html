@@ -141,6 +141,26 @@
         <div id="loading" class="loading">Loading results...</div>
 
         <div id="content" style="display: none;">
+            <div id="comparison-table-container" style="margin-bottom: 30px; display: none;">
+                <h2 style="color: #333; margin-bottom: 15px; font-size: 20px;">Motor Comparison</h2>
+                <div style="overflow-x: auto;">
+                    <table id="comparison-table" style="width: 100%; border-collapse: collapse; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <th style="padding: 12px; text-align: left; font-weight: 600;">Motor</th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600;">Image</th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600;">KV Rating</th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600;">KT Measured<br/><span style="font-size: 0.85em; font-weight: 400;">(mNm/A)</span></th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600;">Burst Torque/Weight<br/><span style="font-size: 0.85em; font-weight: 400;">(mNm/g)</span></th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600;">Burst Torque Error<br/><span style="font-size: 0.85em; font-weight: 400;">(%)</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparison-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div class="select-container">
                 <label for="result-select">Available Results:</label>
                 <select id="result-select">

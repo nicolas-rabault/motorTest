@@ -7,5 +7,6 @@
   "kv_rating": 115,
 
   "current_lim": 10.0,
-  "calibration_current": 5.0
+  "calibration_current": 5.0,
+  "weight_g": 40.0
 }

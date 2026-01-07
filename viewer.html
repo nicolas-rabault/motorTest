@@ -604,6 +604,12 @@
                                 <div class="card-value">${mech.motor_inertia_kg_m2 ? (mech.motor_inertia_kg_m2 * 1e6).toFixed(2) : 'N/A'}</div>
                                 <div class="card-unit">g·cm²</div>
                             </div>
+                            <div class="card card-tooltip" data-tooltip="Motor weight in grams.&#10;Important for calculating torque-to-weight ratio.&#10;Manually measured and entered.">
+                                <div class="card-label">Weight</div>
+                                <div class="card-value">${data.weight_g || 'N/A'}</div>
+                                <div class="card-unit">g</div>
+                            </div>
+                            ${generateBurstTorqueToWeightCard(data)}
                             <div class="card card-tooltip" data-tooltip="Maximum safe continuous current.&#10;Exceeding may cause overheating or damage.&#10;Used as safety limit in tests.">
                                 <div class="card-label">Max Current</div>
                                 <div class="card-value">${limits.max_current_A || 'N/A'}</div>
@@ -616,6 +622,43 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            `;
+        }
+
+        function generateBurstTorqueToWeightCard(data) {
+            // Calculate burst torque to weight ratio
+            const burst = data.torque_burst_test;
+            const weight = data.weight_g;
+
+            if (!burst || !burst.data || burst.data.length === 0 || !weight || weight <= 0) {
+                return `
+                    <div class="card card-tooltip" data-tooltip="Burst torque to weight ratio.&#10;Average measured torque divided by motor weight.&#10;Higher is better - indicates power density.&#10;&#10;Requires weight data and burst test.">
+                        <div class="card-label">Burst Torque/Weight</div>
+                        <div class="card-value">N/A</div>
+                        <div class="card-unit">mNm/g</div>
+                    </div>
+                `;
+            }
+
+            // Calculate average measured torque from steady-state portion
+            const steadyStateData = burst.data.filter(d =>
+                d.time_relative_ms >= 10 &&
+                d.time_relative_ms <= burst.duration_ms - 10
+            );
+
+            const measuredTorques = steadyStateData.map(d => d.measured_torque_Nm).filter(t => !isNaN(t));
+            const avgMeasuredTorque = measuredTorques.length > 0 ?
+                measuredTorques.reduce((a, b) => a + b, 0) / measuredTorques.length : 0;
+
+            // Calculate ratio: torque (mNm) / weight (g)
+            const torqueToWeight = (avgMeasuredTorque * 1000) / weight;
+
+            return `
+                <div class="card card-tooltip" data-tooltip="Burst torque to weight ratio.&#10;Average measured torque (${(avgMeasuredTorque * 1000).toFixed(2)} mNm)&#10;divided by motor weight (${weight.toFixed(1)} g).&#10;&#10;Higher is better - indicates power density.">
+                    <div class="card-label">Burst Torque/Weight</div>
+                    <div class="card-value">${torqueToWeight.toFixed(3)}</div>
+                    <div class="card-unit">mNm/g</div>
                 </div>
             `;
         }
