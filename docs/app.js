@@ -121,14 +121,11 @@ function createComparisonRow(filename, data) {
     return row;
 }
 
-// Load results index and populate dropdown
+// Load results index and populate comparison table
 async function loadResults() {
     const loading = document.getElementById('loading');
     const content = document.getElementById('content');
     const errorMessage = document.getElementById('error-message');
-    const select = document.getElementById('result-select');
-    const viewButton = document.getElementById('view-button');
-    const resultCount = document.getElementById('result-count');
 
     try {
         // Fetch the results index
@@ -153,57 +150,12 @@ async function loadResults() {
         // Load and populate comparison table
         await loadComparisonTable(results);
 
-        // Populate dropdown
-        results.forEach(filename => {
-            const option = document.createElement('option');
-            option.value = filename;
-            option.textContent = formatFilename(filename);
-            select.appendChild(option);
-        });
-
-        // Update count
-        resultCount.textContent = `${results.length} result${results.length !== 1 ? 's' : ''} available`;
-
-        // Enable button when selection changes
-        select.addEventListener('change', () => {
-            viewButton.disabled = select.value === '';
-        });
-
-        // Handle view button click
-        viewButton.addEventListener('click', () => {
-            if (select.value) {
-                // In GitHub Actions deployment, everything is in the same directory
-                window.location.href = `viewer.html?file=${encodeURIComponent(select.value)}`;
-            }
-        });
-
-        // Handle Enter key on select
-        select.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && select.value) {
-                viewButton.click();
-            }
-        });
-
     } catch (error) {
         loading.style.display = 'none';
         errorMessage.textContent = error.message;
         errorMessage.style.display = 'block';
         console.error('Error loading results:', error);
     }
-}
-
-// Format filename for display
-function formatFilename(filename) {
-    // Remove .json extension and make more readable
-    let name = filename.replace('.json', '');
-
-    // Replace underscores and hyphens with spaces
-    name = name.replace(/[_-]/g, ' ');
-
-    // Capitalize first letter
-    name = name.charAt(0).toUpperCase() + name.slice(1);
-
-    return name;
 }
 
 // Load results when page loads
