@@ -108,7 +108,8 @@ def run_no_load_test(profile: MotorProfile, args) -> None:
         image_url=profile.image_url,
         motor_type=profile.motor_type,
         pole_pairs=profile.pole_pairs,
-        kv_rating=profile.kv_rating
+        kv_rating=profile.kv_rating,
+        weight_g=profile.weight_g
     )
     results.update_electrical(
         phase_resistance_ohm=result.phase_resistance_ohm,

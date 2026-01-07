@@ -408,7 +408,8 @@ Results are automatically saved to results/<motor>_results.json
             description=profile.description,
             motor_type=profile.motor_type,
             pole_pairs=profile.pole_pairs,
-            kv_rating=profile.kv_rating
+            kv_rating=profile.kv_rating,
+            weight_g=profile.weight_g
         )
         results.update_electrical(
             phase_resistance_ohm=result.phase_resistance_ohm,

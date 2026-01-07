@@ -31,6 +31,7 @@ class MotorProfile:
     kv_rating: float = 100.0
     current_lim: float = 10.0
     calibration_current: float = 5.0
+    weight_g: float = 0.0  # Motor weight in grams
     phase_resistance: Optional[float] = None  # Required for gimbal
     phase_inductance: Optional[float] = None  # Required for gimbal
 

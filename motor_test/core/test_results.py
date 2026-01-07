@@ -42,6 +42,7 @@ class MotorTestResults:
                 "motor_type": "",
                 "pole_pairs": 0,
                 "kv_rating": 0,
+                "weight_g": 0.0,
                 "electrical": {},
                 "mechanical": {},
                 "thermal": {},
@@ -53,7 +54,8 @@ class MotorTestResults:
             }
 
     def update_motor_info(self, description: str = None, motor_type: str = None,
-                         pole_pairs: int = None, kv_rating: float = None, image_url: str = None):
+                         pole_pairs: int = None, kv_rating: float = None, image_url: str = None,
+                         weight_g: float = None):
         """Update basic motor information."""
         if description:
             self.data["description"] = description
@@ -65,6 +67,8 @@ class MotorTestResults:
             self.data["pole_pairs"] = pole_pairs
         if kv_rating is not None:
             self.data["kv_rating"] = kv_rating
+        if weight_g is not None:
+            self.data["weight_g"] = weight_g
 
     def update_electrical(self, phase_resistance_ohm: float = None,
                          phase_inductance_mH: float = None,
