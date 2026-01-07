@@ -1,0 +1,11 @@
+{
+  "name": "Emax_2807_1300KV",
+  "description": "Emax ECO II Series 2807 1300KV",
+  "motor_type": "high_current",
+  "pole_pairs": 7,
+  "kv_rating": 1300,
+  "current_lim": 40.0,
+  "calibration_current": 4.0,
+  "weight_g": 47.6,
+  "image_url": "https://emaxmodel.com/cdn/shop/products/IMG_2835.jpg?v=1603077587"
+}
